@@ -150,11 +150,14 @@ module Channel
         end
       end
 
-      ops.each do |op|
-        op.unregister(cond)
-      end
-
     end
+    
+  ensure
+
+    ops.each do |op|
+      op.unregister(cond)
+    end
+
   end
 
   def on_read(chan:)
