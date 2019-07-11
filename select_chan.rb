@@ -160,10 +160,12 @@ module Channel
 
   end
 
-  def on_read(chan:)
+  def on_read(chan:, &blk)
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do
-      chan.deq(true)
+      res = chan.deq(true)
+      res = blk.call unless blk.nil?
+      res
     end
     op.define_singleton_method(:ready?) do
       !chan.empty? || chan.closed?
@@ -177,10 +179,12 @@ module Channel
     op
   end
 
-  def on_write(chan:, obj:)
+  def on_write(chan:, obj:, &blk)
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do
-      chan.enq(obj, true)
+      res = chan.enq(obj, true)
+      res = blk.call unless blk.nil?
+      res
     end
     op.define_singleton_method(:ready?) do
       chan.size < chan.max || chan.closed?
@@ -195,4 +199,8 @@ module Channel
   end
 
   module_function :select_chan, :on_read, :on_write
+end
+
+class Object
+  include Channel
 end
