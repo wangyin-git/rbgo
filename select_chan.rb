@@ -28,6 +28,43 @@ module Channel
       @writable_observers.extend(MonitorMixin)
     end
 
+    def push(obj, nonblock = false)
+      super(obj, nonblock)
+      notify_readable_observers
+      self
+    rescue ThreadError
+      raise ClosedQueueError.new if closed?
+      raise
+    end
+
+    def pop(nonblock = false)
+      res = super(nonblock)
+      notify_writable_observers
+      res
+    rescue ThreadError
+      raise unless closed?
+    end
+
+    def clear
+      super
+      notify_writable_observers
+      self
+    end
+
+    def close
+      super
+      notify_readable_observers
+      notify_writable_observers
+      self
+    end
+
+    alias_method :<<, :push
+    alias_method :enq, :push
+    alias_method :deq, :pop
+    alias_method :shift, :pop
+
+    private
+
     def register(observer:, mode: :rw)
       unless observer.is_a? ConditionVariable
         return false
@@ -77,43 +114,6 @@ module Channel
       true
     end
 
-    def push(obj, nonblock = false)
-      super(obj, nonblock)
-      notify_readable_observers
-      self
-    rescue ThreadError
-      raise ClosedQueueError.new if closed?
-      raise
-    end
-
-    def pop(nonblock = false)
-      res = super(nonblock)
-      notify_writable_observers
-      res
-    rescue ThreadError
-      raise unless closed?
-    end
-
-    def clear
-      super
-      notify_writable_observers
-      self
-    end
-
-    def close
-      super
-      notify_readable_observers
-      notify_writable_observers
-      self
-    end
-
-    alias_method :<<, :push
-    alias_method :enq, :push
-    alias_method :deq, :pop
-    alias_method :shift, :pop
-
-    private
-
     def notify_readable_observers
       @readable_observers.each(&:broadcast)
     end
@@ -151,7 +151,7 @@ module Channel
       end
 
     end
-    
+
   ensure
 
     ops.each do |op|
@@ -171,10 +171,10 @@ module Channel
       !chan.empty? || chan.closed?
     end
     op.define_singleton_method(:register) do |cond|
-      chan.register(observer: cond, mode: :r)
+      chan.send :register, observer: cond, mode: :r
     end
     op.define_singleton_method(:unregister) do |cond|
-      chan.unregister(observer: cond, mode: :r)
+      chan.send :unregister, observer: cond, mode: :r
     end
     op
   end
@@ -190,10 +190,10 @@ module Channel
       chan.size < chan.max || chan.closed?
     end
     op.define_singleton_method(:register) do |cond|
-      chan.register(observer: cond, mode: :w)
+      chan.send :register, observer: cond, mode: :w
     end
     op.define_singleton_method(:unregister) do |cond|
-      chan.unregister(observer: cond, mode: :w)
+      chan.send :unregister, observer: cond, mode: :w
     end
     op
   end
