@@ -3,6 +3,7 @@ require 'set'
 require 'monitor'
 
 module Channel
+
   module Chan
 
     def self.new(max = 0)
@@ -73,7 +74,12 @@ module Channel
     end
   end
 
-
+  # NonBufferChan
+  #
+  #
+  #
+  #
+  #
   class NonBufferChan
     include Chan
 
@@ -191,6 +197,15 @@ module Channel
   end
 
 
+
+
+  # BufferChan
+  #
+  #
+  #
+  #
+  #
+  #
   class BufferChan < SizedQueue
     include Chan
     include Enumerable
@@ -258,6 +273,14 @@ module Channel
   end
 
 
+  # select_chan
+  #
+  #
+  #
+  #
+  #
+  #
+  #
   def select_chan(*ops)
     ops.shuffle!
 
@@ -293,6 +316,11 @@ module Channel
 
   end
 
+  # on_read
+  #
+  #
+  #
+  #
   def on_read(chan:, &blk)
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do
@@ -312,6 +340,12 @@ module Channel
     op
   end
 
+  # on_write
+  #
+  #
+  #
+  #
+  #
   def on_write(chan:, obj:, &blk)
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do

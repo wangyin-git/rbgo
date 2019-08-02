@@ -20,14 +20,14 @@ require_relative 'select_chan'
 
 include Channel
 
-ch1 = Chan.new(3)
+ch1 = Chan.new  # non-buffer channel
 ch2 = Chan.new(2)
 ch3 = Chan.new(1)
 
 ch3 << 'hello'
 
 select_chan(
-  on_read(chan: ch1){|obj| # obj is the value read from ch1
+  on_read(chan: ch1){|obj, ok| # obj is the value read from ch1, ok indicates success or failure by close
     #do when read success
   },
   on_read(chan: ch2){
@@ -72,37 +72,7 @@ end
 wg.wait
 puts 'wg.wait done'
 
-```        
-# NonBufferQueue                                
-NonBUfferQueue is like non-buffer chan in golang, but it can not be used directly in select_chan, because I dont known how to implement nonblock semantics
-
-example:
-
-```ruby   
-require_relative 'corun'
-require_relative 'non_buffer_queue'
-
-using CoRunExtensions
-  
-queue = NonBufferQueue.new
-  
-go do
-  queue << 1
-end
-  
-go do
-  queue << 2
-end
-  
-obj1, ok = queue.deq
-p [obj1, ok] # ok is true
-  
-queue.close
-  
-obj2, ok = queue.deq
-p [obj2, ok] # ok is false
-
-```    
+```            
 # NetworkService
 
 open TCP or UDP service 
