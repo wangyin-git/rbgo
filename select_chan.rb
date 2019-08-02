@@ -67,10 +67,12 @@ module Channel
 
     def notify_readable_observers
       @readable_observers.each(&:broadcast)
+      nil
     end
 
     def notify_writable_observers
       @writable_observers.each(&:broadcast)
+      nil
     end
   end
 
@@ -137,6 +139,7 @@ module Channel
         enq_mutex.unlock
       end
 
+      self
     end
 
     def pop(nonblock = false)
@@ -178,6 +181,7 @@ module Channel
       deq_cond.broadcast
       notify_readable_observers
       notify_writable_observers
+      self
     end
 
     def closed?
