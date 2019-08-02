@@ -18,6 +18,7 @@ example:
 ```ruby
 require_relative 'select_chan'
 
+include Channel
 
 ch1 = Chan.new(3)
 ch2 = Chan.new(2)
