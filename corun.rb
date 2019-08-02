@@ -90,7 +90,7 @@ module CoRun
               ensure
                 Thread.current.thread_variable_set(:performing, false)
               end
-              
+
               if task.alive?
                 yield_task_queue << task
               end
@@ -180,8 +180,10 @@ module CoRun
   end
 end
 
-module Kernel
-  def go(*args, &blk)
-    CoRun::Routine.new(*args, &blk)
+module CoRunExtensions
+  refine Kernel do
+    def go(*args, &blk)
+      CoRun::Routine.new(*args, &blk)
+    end
   end
 end

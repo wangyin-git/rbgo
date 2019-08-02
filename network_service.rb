@@ -3,6 +3,9 @@ require_relative 'select_chan'
 require_relative 'corun'
 
 module NetworkServiceFactory
+  using CoRunExtensions
+  include Channel
+
   class Service
     attr_reader :host, :port, :type
     attr_accessor :task

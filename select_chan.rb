@@ -200,7 +200,3 @@ module Channel
 
   module_function :select_chan, :on_read, :on_write
 end
-
-class Object
-  include Channel
-end
