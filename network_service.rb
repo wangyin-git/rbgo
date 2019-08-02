@@ -11,22 +11,25 @@ module NetworkServiceFactory
     attr_accessor :task
 
     def alive?
-      service_thread.alive?
+      service_routine.alive?
     end
 
     def stop
-      service_thread.terminate
+      sockets.each do|sock|
+        sock.close
+      end
     end
 
     private
 
-    attr_accessor :service_thread
+    attr_accessor :service_routine, :sockets
     attr_writer :host, :port, :type
 
     def initialize
       self.type = :unknown
       self.host = nil
       self.port = 0
+      self.sockets = []
     end
 
     class << self
@@ -37,10 +40,9 @@ module NetworkServiceFactory
   def open_tcp_service(host = nil, port, &blk)
 
     res_chan = Chan.new(1)
+    service = Service.send :new
 
-    go do
-      service = Service.send :new
-      service.send :service_thread=, Thread.current
+    routine = go do
       service.send :type=, :tcp
       service.send :host=, host
       service.send :port=, port
@@ -48,6 +50,8 @@ module NetworkServiceFactory
       begin
         Socket.tcp_server_sockets(host, port) do |sockets|
           service.send :port=, sockets.first.local_address.ip_port
+          service.send :sockets=, sockets
+
           res_chan << service
 
           begin
@@ -71,16 +75,17 @@ module NetworkServiceFactory
       end
     end
 
+    service.send :service_routine=, routine
+
     res_chan.deq
   end
 
   def open_udp_service(host = nil, port, &blk)
 
     res_chan = Chan.new(1)
+    service = Service.send :new
 
-    go do
-      service = Service.send :new
-      service.send :service_thread=, Thread.current
+    routine = go do
       service.send :type=, :udp
       service.send :host=, host
       service.send :port=, port
@@ -88,6 +93,8 @@ module NetworkServiceFactory
       begin
         Socket.udp_server_sockets(host, port) do |sockets|
           service.send :port=, sockets.first.local_address.ip_port
+          service.send :sockets=, sockets
+
           res_chan << service
 
           begin
@@ -106,6 +113,8 @@ module NetworkServiceFactory
         STDERR.puts ex
       end
     end
+
+    service.send :service_routine, routine
 
     res_chan.deq
   end

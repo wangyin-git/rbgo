@@ -181,7 +181,7 @@ module CoRun
 end
 
 module CoRunExtensions
-  refine Kernel do
+  refine Object do
     def go(*args, &blk)
       CoRun::Routine.new(*args, &blk)
     end
