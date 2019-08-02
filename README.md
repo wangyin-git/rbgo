@@ -1,4 +1,4 @@
-#I like the way how golang does in concurrency.
+# I like the way how golang does in concurrency.
  
 You can produce a light weight routine easily with a keyword 'go' and communicate with each routine by channel.
 
@@ -6,7 +6,7 @@ In MRI implementation GIL prevent you from running code parallelly, but there ar
 
 In MRI write program to run concurrently even not parallelly is also important.
 
-#This project is trying to help writing concurrent program with ruby a little easier.     
+# This project is trying to help writing concurrent program with ruby a little easier.     
 
 # select_chan                       
 select channels like golang in ruby
