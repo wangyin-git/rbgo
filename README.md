@@ -5,7 +5,7 @@ Chan is buffered, just like make(chan type,n) in golang
 
 example:
 
-```
+```ruby
 require_relative 'select_chan'
 
 
@@ -32,7 +32,7 @@ create lightweight routine like golang
 
 example:
 
-```
+```ruby
 require_relative 'corun'
 require_relative 'wait_group'
 
@@ -64,7 +64,7 @@ NonBUfferQueue is like non-buffer chan in golang, but it can not be used directl
 
 example:
 
-```   
+```ruby   
 require_relative 'corun'
 require_relative 'non_buffer_queue'
 
@@ -96,7 +96,7 @@ open TCP or UDP service
 because service handles network request in async mode, it can handle many requests concurrently. If use some Non-GIL ruby implementations such as Truffleruby or Jruby, it can utilize all your CPU cores.  
 
 
-```  
+```ruby  
 require_relative 'network_service'
         
 #localhost, port 3000
