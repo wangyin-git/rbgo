@@ -11,7 +11,7 @@ In MRI write program to run concurrently even not parallelly is also important.
 # select_chan                       
 select channels like golang in ruby
 
-Chan is buffered, just like make(chan type,n) in golang
+Chan is buffered or non-buffered, just like make(chan Type,n) or make(chan Type) in golang
 
 example:
 
@@ -21,7 +21,7 @@ require_relative 'select_chan'
 include Channel
 
 ch1 = Chan.new  # non-buffer channel
-ch2 = Chan.new(2)
+ch2 = Chan.new(2) # buffer channel 
 ch3 = Chan.new(1)
 
 ch3 << 'hello'
