@@ -91,7 +91,7 @@ p [obj2, ok]
 ```    
 # NetworkService
 
-open Tcp or Udp service 
+open TCP or UDP service 
 
 because service handles network request in async mode, it can handle many requests concurrently. If use some Non-GIL ruby implementations such as Truffleruby or Jruby, it can utilize all your CPU cores.  
 
