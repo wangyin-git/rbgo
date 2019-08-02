@@ -3,65 +3,15 @@ require 'set'
 require 'monitor'
 
 module Channel
-  class Chan < SizedQueue
-    include Enumerable
+  module Chan
 
-    def each
-      if block_given?
-        loop do
-          begin
-            yield pop(true)
-          rescue ThreadError
-            return
-          end
-        end
+    def self.new(max = 0)
+      if max <= 0
+        NonBufferChan.new
       else
-        enum_for(:each)
+        BufferChan.new(max)
       end
     end
-
-    def initialize(max)
-      super(max)
-      @readable_observers = Set.new
-      @readable_observers.extend(MonitorMixin)
-      @writable_observers = Set.new
-      @writable_observers.extend(MonitorMixin)
-    end
-
-    def push(obj, nonblock = false)
-      super(obj, nonblock)
-      notify_readable_observers
-      self
-    rescue ThreadError
-      raise ClosedQueueError.new if closed?
-      raise
-    end
-
-    def pop(nonblock = false)
-      res = super(nonblock)
-      notify_writable_observers
-      res
-    rescue ThreadError
-      raise unless closed?
-    end
-
-    def clear
-      super
-      notify_writable_observers
-      self
-    end
-
-    def close
-      super
-      notify_readable_observers
-      notify_writable_observers
-      self
-    end
-
-    alias_method :<<, :push
-    alias_method :enq, :push
-    alias_method :deq, :pop
-    alias_method :shift, :pop
 
     private
 
@@ -123,6 +73,191 @@ module Channel
     end
   end
 
+
+  class NonBufferChan
+    include Chan
+
+    def initialize
+      self.enq_mutex             = Mutex.new
+      self.deq_mutex             = Mutex.new
+      self.enq_cond              = ConditionVariable.new
+      self.deq_cond              = ConditionVariable.new
+      self.resource_array        = []
+      self.close_flag            = false
+      self.have_enq_waiting_flag = false
+      self.have_deq_waiting_flag = false
+
+      @readable_observers = Set.new
+      @readable_observers.extend(MonitorMixin)
+      @writable_observers = Set.new
+      @writable_observers.extend(MonitorMixin)
+    end
+
+    def push(obj, nonblock = false)
+      if closed?
+        raise ClosedQueueError.new
+      end
+
+      if nonblock
+        raise ThreadError.new unless enq_mutex.try_lock
+      else
+        enq_mutex.lock
+      end
+
+      begin
+        if nonblock
+          raise ThreadError.new unless have_deq_waiting_flag
+        end
+        
+        begin
+          if closed?
+            raise ClosedQueueError.new
+          else
+            deq_mutex.synchronize do
+              resource_array[0] = obj
+              enq_cond.signal
+              until resource_array.empty? || closed?
+                self.have_enq_waiting_flag = true
+                notify_readable_observers
+                deq_cond.wait(deq_mutex)
+              end
+              raise ClosedQueueError.new if closed?
+            end
+          end
+        ensure
+          self.have_enq_waiting_flag = false
+        end
+      ensure
+        enq_mutex.unlock
+      end
+
+    end
+
+    def pop(nonblock = false)
+      resource = nil
+      if closed?
+        return [nil, false]
+      end
+
+      if nonblock
+        raise ThreadError.new unless deq_mutex.try_lock
+      else
+        deq_mutex.lock
+      end
+
+      begin
+        if nonblock
+          raise ThreadError.new unless have_enq_waiting_flag
+        end
+
+        while resource_array.empty? && !closed?
+          self.have_deq_waiting_flag = true
+          notify_writable_observers
+          enq_cond.wait(deq_mutex)
+        end
+        resource = resource_array.first
+        resource_array.clear
+        self.have_deq_waiting_flag = false
+        deq_cond.signal
+      ensure
+        deq_mutex.unlock
+      end
+
+      [resource, !closed?]
+    end
+
+    def close
+      self.close_flag = true
+      enq_cond.broadcast
+      deq_cond.broadcast
+      notify_readable_observers
+      notify_writable_observers
+    end
+
+    def closed?
+      close_flag
+    end
+
+    alias_method :<<, :push
+    alias_method :enq, :push
+    alias_method :deq, :pop
+    alias_method :shift, :pop
+
+    private
+
+    attr_accessor :enq_mutex, :deq_mutex, :enq_cond,
+                  :deq_cond, :resource_array, :close_flag,
+                  :have_enq_waiting_flag, :have_deq_waiting_flag
+  end
+
+
+  class BufferChan < SizedQueue
+    include Chan
+    include Enumerable
+
+    def each
+      if block_given?
+        loop do
+          begin
+            yield pop(true)
+          rescue ThreadError
+            return
+          end
+        end
+      else
+        enum_for(:each)
+      end
+    end
+
+    def initialize(max)
+      super(max)
+      @readable_observers = Set.new
+      @readable_observers.extend(MonitorMixin)
+      @writable_observers = Set.new
+      @writable_observers.extend(MonitorMixin)
+    end
+
+    def push(obj, nonblock = false)
+      super(obj, nonblock)
+      notify_readable_observers
+      self
+    rescue ThreadError
+      raise ClosedQueueError.new if closed?
+      raise
+    end
+
+    def pop(nonblock = false)
+      res = nil
+      begin
+        res = super(nonblock)
+        notify_writable_observers
+        res
+      rescue ThreadError
+        raise unless closed?
+      end
+      [res, !closed?]
+    end
+
+    def clear
+      super
+      notify_writable_observers
+      self
+    end
+
+    def close
+      super
+      notify_readable_observers
+      notify_writable_observers
+      self
+    end
+
+    alias_method :<<, :push
+    alias_method :enq, :push
+    alias_method :deq, :pop
+    alias_method :shift, :pop
+  end
+
+
   def select_chan(*ops)
     ops.shuffle!
 
@@ -145,9 +280,7 @@ module Channel
       end
 
       mutex.synchronize do
-        until ops.any?(&:ready?)
-          cond.wait mutex
-        end
+        cond.wait mutex
       end
 
     end
@@ -163,12 +296,12 @@ module Channel
   def on_read(chan:, &blk)
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do
-      res = chan.deq(true)
-      res = blk.call(res) unless blk.nil?
-      res
-    end
-    op.define_singleton_method(:ready?) do
-      !chan.empty? || chan.closed?
+      res, ok = chan.deq(true)
+      if blk.nil?
+        [res, ok]
+      else
+        blk.call(res, ok)
+      end
     end
     op.define_singleton_method(:register) do |cond|
       chan.send :register, observer: cond, mode: :r
@@ -186,9 +319,7 @@ module Channel
       res = blk.call unless blk.nil?
       res
     end
-    op.define_singleton_method(:ready?) do
-      chan.size < chan.max || chan.closed?
-    end
+
     op.define_singleton_method(:register) do |cond|
       chan.send :register, observer: cond, mode: :w
     end

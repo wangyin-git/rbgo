@@ -78,6 +78,7 @@ module NetworkServiceFactory
     service.send :service_routine=, routine
 
     res_chan.deq
+    service
   end
 
   def open_udp_service(host = nil, port, &blk)
@@ -117,6 +118,7 @@ module NetworkServiceFactory
     service.send :service_routine, routine
 
     res_chan.deq
+    service
   end
 
   module_function :open_tcp_service, :open_udp_service
