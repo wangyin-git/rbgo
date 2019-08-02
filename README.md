@@ -2,7 +2,7 @@
  
 You can produce a light weight routine easily with a keyword 'go' and communicate with each routine by channel.
 
-In MRI implementation GIL prevent you from running code parallelly, but there ara also other ruby implementations such as TruffleRuby or JRuby which can utilize all CPU cores.
+In MRI the GIL prevents you from running code parallelly, but there ara also other ruby implementations such as TruffleRuby or JRuby which can utilize all CPU cores.
 
 In MRI write program to run concurrently even not parallelly is also important.
 
