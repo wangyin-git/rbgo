@@ -164,7 +164,7 @@ module Channel
     raise ArgumentError.new('chan must be a Chan') unless chan.is_a? Chan
     op = Proc.new do
       res = chan.deq(true)
-      res = blk.call unless blk.nil?
+      res = blk.call(res) unless blk.nil?
       res
     end
     op.define_singleton_method(:ready?) do
