@@ -9,7 +9,8 @@ module CoRun
     attr_accessor :error
 
     def alive?
-      fiber.alive?
+      return fiber.alive? unless fiber.nil?
+      true
     end
 
     private
