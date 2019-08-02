@@ -12,6 +12,7 @@ In MRI write program to run concurrently even not parallelly is also important.
 select channels like golang in ruby
 
 Chan is buffered or non-buffered, just like make(chan Type,n) or make(chan Type) in golang
+but not statically typed in my implementation.
 
 example:
 
