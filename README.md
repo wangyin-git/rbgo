@@ -91,6 +91,8 @@ end
                                         
 
 p "start tcp service: #{[tcp_service.host, tcp_service.port, tcp_service.type]}"
+                 
+sleep 5
 
 tcp_service.stop
                             
@@ -103,6 +105,8 @@ udp_service = Rbgo::NetworkServiceFactory.open_udp_service(0) do|msg, reply_msg|
 end
 
 p "start udp service: #{[udp_service.host, udp_service.port, udp_service.type]}"
+          
+sleep 5
 
 udp_service.stop
 
