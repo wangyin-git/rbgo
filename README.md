@@ -42,11 +42,13 @@ select_chan(
 # go                                
 create lightweight routine like golang
 
-routine does not create a thread instead it is picked by a thread in pool.
+Routine does not create a thread instead it is picked by a thread in pool.
 
-routine use fiber to yield processor, so you can call Fiber.yield, just like Gosched() in golang.
+Routine use fiber to yield processor, so you can call Fiber.yield, just like Gosched() in golang.
 
-if routine is suspended by a blocking operation for enough long time, a new thread will be created to handle other routine. Suspended thread will exit when it completes current routine.  
+If routine raise exception it does not affect other routine. Check Routine#alive? to see if it is alive, and check Routine#error to see if something went wrong. 
+
+If routine is suspended by a blocking operation for enough long time, a new thread will be created to handle other routine. Suspended thread will exit when it completes current routine.  
 
  
 
@@ -85,7 +87,7 @@ puts 'wg.wait done'
 
 open TCP or UDP service 
 
-because service handles network request in async mode, it can handle many requests concurrently. If use some Non-GIL ruby implementations such as TruffleRuby or JRuby, it can utilize all your CPU cores.  
+Because service handles network request in async mode, it can handle many requests concurrently. If use some Non-GIL ruby implementations such as TruffleRuby or JRuby, it can utilize all your CPU cores.  
 
 
 ```ruby  
