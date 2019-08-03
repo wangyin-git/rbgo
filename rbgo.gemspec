@@ -11,6 +11,8 @@ Gem::Specification.new do |s|
   s.homepage    = "https://github.com/wangyin-git/rbgo"
   s.summary     = "Write concurrent program with Ruby in Golang style"
   s.description = <<-END
+                    Write concurrent program with Ruby in Golang style.  
+
                     You can produce a light weight routine easily with a method 'go' and communicate with each routine by channel.
 
                     In MRI the GIL prevents you from running code parallelly, but there ara also other ruby implementations such as TruffleRuby or JRuby which can utilize all CPU cores.
