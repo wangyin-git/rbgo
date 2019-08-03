@@ -157,6 +157,7 @@ module Rbgo
 
       def pop(nonblock = false)
         resource = nil
+        ok = true
         if closed?
           return [nil, false]
         end
@@ -178,6 +179,7 @@ module Rbgo
             enq_cond.wait(deq_mutex)
           end
           resource = resource_array.first
+          ok = false if resource_array.empty?
           resource_array.clear
           self.have_deq_waiting_flag = false
           deq_cond.signal
@@ -185,7 +187,7 @@ module Rbgo
           deq_mutex.unlock
         end
 
-        [resource, !closed?]
+        [resource, ok]
       end
 
       def close
@@ -258,14 +260,16 @@ module Rbgo
 
       def pop(nonblock = false)
         res = nil
+        ok = true
         begin
           res = super(nonblock)
           notify_writable_observers
           res
         rescue ThreadError
           raise unless closed?
+          ok = false
         end
-        [res, !closed?]
+        [res, ok]
       end
 
       def clear
