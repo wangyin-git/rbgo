@@ -19,6 +19,7 @@ Gem::Specification.new do |s|
 
                     This project is trying to help writing concurrent program with ruby a little easier
                   END
-  s.add_dependency "sys-cpu"
+  s.add_dependency "sys-cpu", "~> 0.8"
   s.files         = `git ls-files`.split("\n")
+  s.license       = 'MIT'
 end
