@@ -3,7 +3,6 @@ require 'set'
 require 'monitor'
 
 module Channel
-
   module Chan
 
     def self.new(max = 0)
@@ -116,7 +115,7 @@ module Channel
         if nonblock
           raise ThreadError.new unless have_deq_waiting_flag
         end
-        
+
         begin
           if closed?
             raise ClosedQueueError.new
@@ -126,7 +125,20 @@ module Channel
               enq_cond.signal
               until resource_array.empty? || closed?
                 self.have_enq_waiting_flag = true
-                notify_readable_observers
+
+                begin
+                  Thread.new do
+                    deq_mutex.synchronize do
+                      # no op
+                    end
+                    notify_readable_observers
+                  end
+                rescue Exception => ex
+                  STDERR.puts ex
+                  sleep 1
+                  retry
+                end
+
                 deq_cond.wait(deq_mutex)
               end
               raise ClosedQueueError.new if closed?
@@ -199,8 +211,6 @@ module Channel
                   :deq_cond, :resource_array, :close_flag,
                   :have_enq_waiting_flag, :have_deq_waiting_flag
   end
-
-
 
 
   # BufferChan
