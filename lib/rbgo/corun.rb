@@ -37,8 +37,9 @@ module Rbgo
     end
 
     class Scheduler
+
       include Singleton
-      attr_accessor :num_thread
+      attr_accessor :num_thread, :check_interval
 
       private
 
@@ -53,6 +54,8 @@ module Rbgo
 
         self.msg_queue  = Queue.new
         self.task_queue = Queue.new
+
+        self.check_interval = 0.1
 
         msg_queue << :init
         create_supervisor_thread
@@ -134,7 +137,7 @@ module Rbgo
           begin
             loop do
               msg_queue << :check
-              sleep 3
+              sleep check_interval
             end
           ensure
             STDERR.puts 'check generator thread exit'
