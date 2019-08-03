@@ -42,6 +42,14 @@ select_chan(
 # go                                
 create lightweight routine like golang
 
+routine does not create a thread instead it is picked by a thread in pool
+
+routine use fiber to yield processor, so you can call Fiber.yield, just like Gosched() in golang
+
+if routine is suspended by a blocking operation for enough long time, a new thread will be created to handle other routine. Suspended thread will exit when it completes current routine  
+
+ 
+
 example:
 
 ```ruby
