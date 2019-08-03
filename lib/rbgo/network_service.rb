@@ -116,7 +116,7 @@ module Rbgo
         end
       end
 
-      service.send :service_routine, routine
+      service.send :service_routine=, routine
 
       res_chan.deq
       service
