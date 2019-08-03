@@ -1,0 +1,21 @@
+PATH
+  remote: .
+  specs:
+    rbgo (0.1.0)
+      sys-cpu
+
+GEM
+  remote: http://rubygems.org/
+  specs:
+    ffi (1.11.1)
+    sys-cpu (0.8.0)
+      ffi
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rbgo!
+
+BUNDLED WITH
+   2.0.2
