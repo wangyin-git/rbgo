@@ -17,7 +17,7 @@ Gem::Specification.new do |s|
 
                     In MRI write program to run concurrently even not parallelly is also important.    
 
-                    This project is trying to help writing concurrent program with ruby a little easier
+                    This project is trying to help writing concurrent program with ruby a little easier.
                   END
   s.add_dependency "sys-cpu", "~> 0.8"
   s.files         = `git ls-files`.split("\n")
