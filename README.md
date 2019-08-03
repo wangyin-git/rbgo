@@ -17,9 +17,9 @@ but not statically typed in my implementation.
 example:
 
 ```ruby
-require_relative 'select_chan'
+relative 'rbgo'
 
-include Channel
+include Rbgo::Channel
 
 ch1 = Chan.new  # non-buffer channel
 ch2 = Chan.new(2) # buffer channel 
@@ -45,12 +45,11 @@ create lightweight routine like golang
 example:
 
 ```ruby
-require_relative 'corun'
-require_relative 'wait_group'
+require 'rbgo'
 
-using CoRunExtensions
+using Rbgo::CoRunExtensions
 
-wg = WaitGroup.new
+wg = Rbgo::WaitGroup.new
 
 wg.add(1)
 go do
@@ -82,10 +81,10 @@ because service handles network request in async mode, it can handle many reques
 
 
 ```ruby  
-require_relative 'network_service'
-        
+require 'rbgo'
+
 #localhost, port 3000
-tcp_service = NetworkServiceFactory.open_tcp_service(3000) do|sock, clientAddrInfo|
+tcp_service = Rbgo::NetworkServiceFactory.open_tcp_service(3000) do|sock, clientAddrInfo|
   p [sock, clientAddrInfo]
 end                  
 
@@ -98,7 +97,7 @@ tcp_service.stop
           
 
 #localhost, port auto pick
-udp_service = NetworkServiceFactory.open_udp_service(0) do|msg, reply_msg|
+udp_service = Rbgo::NetworkServiceFactory.open_udp_service(0) do|msg, reply_msg|
   p msg
   reply_msg.reply("I receive your message")
 end
