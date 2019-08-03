@@ -157,7 +157,7 @@ module Rbgo
 
       def pop(nonblock = false)
         resource = nil
-        ok = true
+        ok       = true
         if closed?
           return [nil, false]
         end
@@ -179,7 +179,7 @@ module Rbgo
             enq_cond.wait(deq_mutex)
           end
           resource = resource_array.first
-          ok = false if resource_array.empty?
+          ok       = false if resource_array.empty?
           resource_array.clear
           self.have_deq_waiting_flag = false
           deq_cond.signal
@@ -191,12 +191,14 @@ module Rbgo
       end
 
       def close
-        self.close_flag = true
-        enq_cond.broadcast
-        deq_cond.broadcast
-        notify_readable_observers
-        notify_writable_observers
-        self
+        deq_mutex.synchronize do
+          self.close_flag = true
+          enq_cond.broadcast
+          deq_cond.broadcast
+          notify_readable_observers
+          notify_writable_observers
+          self
+        end
       end
 
       def closed?
@@ -247,6 +249,8 @@ module Rbgo
         @readable_observers.extend(MonitorMixin)
         @writable_observers = Set.new
         @writable_observers.extend(MonitorMixin)
+
+        @mutex = Mutex.new
       end
 
       def push(obj, nonblock = false)
@@ -259,17 +263,19 @@ module Rbgo
       end
 
       def pop(nonblock = false)
-        res = nil
-        ok = true
-        begin
-          res = super(nonblock)
-          notify_writable_observers
-          res
-        rescue ThreadError
-          raise unless closed?
-          ok = false
+        @mutex.synchronize do
+          res = nil
+          ok  = true
+          ok  = false if empty? && closed?
+          begin
+            res = super(nonblock)
+            notify_writable_observers
+          rescue ThreadError
+            raise unless closed?
+            ok = false
+          end
+          [res, ok]
         end
-        [res, ok]
       end
 
       def clear
@@ -279,10 +285,12 @@ module Rbgo
       end
 
       def close
-        super
-        notify_readable_observers
-        notify_writable_observers
-        self
+        @mutex.synchronize do
+          super
+          notify_readable_observers
+          notify_writable_observers
+          self
+        end
       end
 
       alias_method :<<, :push
