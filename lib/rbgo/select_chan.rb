@@ -1,6 +1,4 @@
 require 'thread'
-require 'set'
-require 'monitor'
 
 module Rbgo
   module Channel
@@ -16,65 +14,13 @@ module Rbgo
 
       private
 
-      def register(observer:, mode: :rw)
-        unless observer.is_a? ConditionVariable
-          return false
-        end
-        mode = mode.to_sym.downcase
-        if mode == :rw
-          @readable_observers.synchronize do
-            @readable_observers.add(observer)
-          end
-          @writable_observers.synchronize do
-            @writable_observers.add(observer)
-          end
-        elsif mode == :r
-          @readable_observers.synchronize do
-            @readable_observers.add(observer)
-          end
-        elsif mode == :w
-          @writable_observers.synchronize do
-            @writable_observers.add(observer)
-          end
-        else
-          return false
-        end
-        true
-      end
+      attr_accessor :io_r, :io_w
 
-      def unregister(observer:, mode: :rw)
-        mode = mode.to_sym.downcase
-        if mode == :rw
-          @readable_observers.synchronize do
-            @readable_observers.delete(observer)
-          end
-          @writable_observers.synchronize do
-            @writable_observers.delete(observer)
-          end
-        elsif mode == :r
-          @readable_observers.synchronize do
-            @readable_observers.delete(observer)
-          end
-        elsif mode == :w
-          @writable_observers.synchronize do
-            @writable_observers.delete(observer)
-          end
-        else
-          return false
-        end
-        true
+      def notify
+        tmp                  = io_w
+        self.io_r, self.io_w = IO.pipe
+        tmp.close
       end
-
-      def notify_readable_observers
-        @readable_observers.each(&:broadcast)
-        nil
-      end
-
-      def notify_writable_observers
-        @writable_observers.each(&:broadcast)
-        nil
-      end
-
     end
 
     # NonBufferChan
@@ -96,10 +42,7 @@ module Rbgo
         self.have_enq_waiting_flag = false
         self.have_deq_waiting_flag = false
 
-        @readable_observers = Set.new
-        @readable_observers.extend(MonitorMixin)
-        @writable_observers = Set.new
-        @writable_observers.extend(MonitorMixin)
+        self.io_r, self.io_w = IO.pipe
       end
 
       def push(obj, nonblock = false)
@@ -133,7 +76,7 @@ module Rbgo
                       deq_mutex.synchronize do
                         # no op
                       end
-                      notify_readable_observers
+                      notify
                     end
                   rescue Exception => ex
                     STDERR.puts ex
@@ -176,7 +119,7 @@ module Rbgo
 
           while resource_array.empty? && !closed?
             self.have_deq_waiting_flag = true
-            notify_writable_observers
+            notify
             enq_cond.wait(deq_mutex)
           end
           resource = resource_array.first
@@ -196,8 +139,7 @@ module Rbgo
           self.close_flag = true
           enq_cond.broadcast
           deq_cond.broadcast
-          notify_readable_observers
-          notify_writable_observers
+          notify
           self
         end
       end
@@ -246,17 +188,13 @@ module Rbgo
 
       def initialize(max)
         super(max)
-        @readable_observers = Set.new
-        @readable_observers.extend(MonitorMixin)
-        @writable_observers = Set.new
-        @writable_observers.extend(MonitorMixin)
-
-        @mutex = Mutex.new
+        self.io_r, self.io_w = IO.pipe
+        @mutex               = Mutex.new
       end
 
       def push(obj, nonblock = false)
         super(obj, nonblock)
-        notify_readable_observers
+        notify
         self
       rescue ThreadError
         raise ClosedQueueError.new if closed?
@@ -270,7 +208,7 @@ module Rbgo
           ok  = false if empty? && closed?
           begin
             res = super(nonblock)
-            notify_writable_observers
+            notify
           rescue ThreadError
             raise unless closed?
             ok = false
@@ -281,15 +219,14 @@ module Rbgo
 
       def clear
         super
-        notify_writable_observers
+        notify
         self
       end
 
       def close
         @mutex.synchronize do
           super
-          notify_readable_observers
-          notify_writable_observers
+          notify
           self
         end
       end
@@ -312,36 +249,22 @@ module Rbgo
     def select_chan(*ops)
       ops.shuffle!
 
-      mutex = Mutex.new
-      cond  = ConditionVariable.new
-
-      loop do
+      while true do
+        ios = []
+        ops.each do |op|
+          ios << op.io
+        end
 
         ops.each do |op|
           begin
             return op.call
-          rescue ClosedQueueError
-            raise ThreadError.new
           rescue ThreadError
           end
         end
 
         return yield if block_given?
 
-        ops.each do |op|
-          op.register(cond)
-        end
-
-        mutex.synchronize do
-          cond.wait mutex
-        end
-
-      end
-
-    ensure
-
-      ops.each do |op|
-        op.unregister(cond)
+        IO.select(ios)
       end
 
     end
@@ -361,11 +284,8 @@ module Rbgo
           blk.call(res, ok)
         end
       end
-      op.define_singleton_method(:register) do |cond|
-        chan.send :register, observer: cond, mode: :r
-      end
-      op.define_singleton_method(:unregister) do |cond|
-        chan.send :unregister, observer: cond, mode: :r
+      op.define_singleton_method(:io) do
+        chan.send :io_r
       end
       op
     end
@@ -384,11 +304,8 @@ module Rbgo
         res
       end
 
-      op.define_singleton_method(:register) do |cond|
-        chan.send :register, observer: cond, mode: :w
-      end
-      op.define_singleton_method(:unregister) do |cond|
-        chan.send :unregister, observer: cond, mode: :w
+      op.define_singleton_method(:io) do
+        chan.send :io_r
       end
       op
     end
