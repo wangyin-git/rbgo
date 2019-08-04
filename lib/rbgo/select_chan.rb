@@ -74,6 +74,7 @@ module Rbgo
         @writable_observers.each(&:broadcast)
         nil
       end
+
     end
 
     # NonBufferChan
@@ -319,6 +320,8 @@ module Rbgo
         ops.each do |op|
           begin
             return op.call
+          rescue ClosedQueueError
+            raise ThreadError.new
           rescue ThreadError
           end
         end
