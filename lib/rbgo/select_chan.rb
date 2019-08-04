@@ -19,7 +19,8 @@ module Rbgo
       def notify
         tmp                  = io_w
         self.io_r, self.io_w = IO.pipe
-        tmp.close
+        tmp.close rescue nil
+        nil
       end
     end
 
