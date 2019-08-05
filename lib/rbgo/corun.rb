@@ -18,10 +18,27 @@ module Rbgo
 
       attr_accessor :args, :blk, :fiber
 
-      def initialize(*args, &blk)
+      def initialize(new_thread = false, *args, &blk)
         self.args = args
         self.blk  = blk
-        Scheduler.instance.schedule(self)
+        if new_thread
+          Thread.new do
+            self.fiber = Fiber.new do |args|
+              blk.call(*args)
+            end
+
+            begin
+              while fiber.alive?
+                fiber.resume(*args)
+              end
+            rescue Exception => ex
+              self.error = ex
+            end
+          end
+
+        else
+          Scheduler.instance.schedule(self)
+        end
       end
 
       def perform
@@ -189,6 +206,10 @@ module Rbgo
     refine Object do
       def go(*args, &blk)
         CoRun::Routine.new(*args, &blk)
+      end
+
+      def go!(*args, &blk)
+        CoRun::Routine.new(true, *args, &blk)
       end
     end
   end

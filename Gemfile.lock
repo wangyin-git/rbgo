@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rbgo (0.1.6)
+    rbgo (0.1.7)
       sys-cpu (~> 0.8)
 
 GEM
