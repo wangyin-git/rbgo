@@ -81,6 +81,20 @@ end
 
 wg.wait
 puts 'wg.wait done'
+                             
+
+# the job that takes very long time or never returns such as 'loop'.
+# use Fiber.yield to let other yield jobs on the same thread to run.
+
+go do
+  loop do
+    # do some job
+    # ...
+    Fiber.yield 
+  end
+end
+
+# Or use go!        
 
 go! do         
 
