@@ -66,7 +66,7 @@ module Rbgo
       attr_accessor :supervisor_thread
 
       def initialize
-        self.num_thread  = Sys::CPU.num_cpu
+        self.num_thread  = Sys::CPU.num_cpu || 8
         self.thread_pool = []
 
         self.msg_queue  = Queue.new
