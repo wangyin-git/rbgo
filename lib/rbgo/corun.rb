@@ -18,7 +18,7 @@ module Rbgo
 
       attr_accessor :args, :blk, :fiber
 
-      def initialize(new_thread = false, *args, &blk)
+      def initialize(*args, new_thread: false, &blk)
         self.args = args
         self.blk  = blk
         if new_thread
@@ -205,11 +205,11 @@ module Rbgo
   module CoRunExtensions
     refine Object do
       def go(*args, &blk)
-        CoRun::Routine.new(*args, &blk)
+        CoRun::Routine.new(*args, new_thread: false, &blk)
       end
 
       def go!(*args, &blk)
-        CoRun::Routine.new(true, *args, &blk)
+        CoRun::Routine.new(*args, new_thread: true, &blk)
       end
     end
   end
