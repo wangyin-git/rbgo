@@ -1,6 +1,6 @@
 require 'thread'
 require 'fiber'
-require 'sys-cpu'
+require 'system'
 require 'singleton'
 
 module Rbgo
@@ -66,7 +66,7 @@ module Rbgo
       attr_accessor :supervisor_thread
 
       def initialize
-        self.num_thread  = Sys::CPU.num_cpu || 8
+        self.num_thread  = System::CPU.count || 8
         self.thread_pool = []
 
         self.msg_queue  = Queue.new

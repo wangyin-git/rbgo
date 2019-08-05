@@ -19,7 +19,7 @@ Gem::Specification.new do |s|
 
                     In MRI write program to run concurrently even not parallelly is also important.
                   END
-  s.add_dependency "sys-cpu", "~> 0.8"
+  s.add_dependency "system", "~> 0.1.3"
   s.files         = `git ls-files`.split("\n")
   s.license       = 'MIT'
 end
