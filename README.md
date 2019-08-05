@@ -82,6 +82,16 @@ end
 wg.wait
 puts 'wg.wait done'
 
+go! do         
+
+# go! force a new thread be created to handle this block, and exit when finish.
+# use go! to do blocking operations
+
+end
+
+
+
+
 ```            
 # NetworkService
 
