@@ -58,10 +58,10 @@ module Rbgo
             begin
               Socket.accept_loop(sockets) do |sock, clientAddrInfo|
                 go do
-                  begin
-                    service.task.call(sock, clientAddrInfo) unless service.task.nil?
-                  ensure
+                  if service.task.nil?
                     sock.close
+                  else
+                    service.task.call(sock, clientAddrInfo)
                   end
                 end
               end
