@@ -14,12 +14,23 @@ module Rbgo
 
       private
 
-      attr_accessor :io_r, :io_w
+      attr_accessor :ios
+      attr_accessor :register_mutex
+
+      def register(io)
+        register_mutex.synchronize do
+          ios << io
+          p ios
+        end
+      end
 
       def notify
-        tmp                  = io_w
-        self.io_r, self.io_w = IO.pipe
-        tmp.close rescue nil
+        register_mutex.synchronize do
+          ios.each do |io|
+            io.close rescue nil
+          end
+          ios.clear
+        end
         nil
       end
     end
@@ -43,7 +54,8 @@ module Rbgo
         self.have_enq_waiting_flag = false
         self.have_deq_waiting_flag = false
 
-        self.io_r, self.io_w = IO.pipe
+        self.ios = []
+        self.register_mutex = Mutex.new
       end
 
       def push(obj, nonblock = false)
@@ -189,8 +201,10 @@ module Rbgo
 
       def initialize(max)
         super(max)
-        self.io_r, self.io_w = IO.pipe
-        @mutex               = Mutex.new
+        @mutex = Mutex.new
+
+        self.ios = []
+        self.register_mutex = Mutex.new
       end
 
       def push(obj, nonblock = false)
@@ -250,24 +264,50 @@ module Rbgo
     def select_chan(*ops)
       ops.shuffle!
 
-      while true do
-        ios = []
-        ops.each do |op|
-          ios << op.io
+      io_hash      = {}
+      close_io_blk = proc do
+        io_hash.each_pair.flat_map do |k, v|
+          [k, v[1]]
+        end.each do |io|
+          io.close rescue nil
         end
-
-        ops.each do |op|
-          begin
-            return op.call
-          rescue ThreadError
-          end
-        end
-
-        return yield if block_given?
-
-        IO.select(ios)
       end
 
+      begin
+        while true do
+
+          close_io_blk.call
+          io_hash.clear
+
+          ops.each do |op|
+            io_r, io_w = IO.pipe
+            op.register(io_w)
+            io_hash[io_r] = [op, io_w]
+          end
+
+          ops.each do |op|
+            begin
+              return op.call
+            rescue ThreadError
+            end
+          end
+
+          return yield if block_given?
+
+          read_ios = IO.select(io_hash.keys).first rescue []
+
+          read_ios.each do |io_r|
+            op = io_hash[io_r].first
+            begin
+              return op.call
+            rescue ThreadError
+            end
+          end
+
+        end
+      ensure
+        close_io_blk.call
+      end
     end
 
     # on_read
@@ -285,8 +325,8 @@ module Rbgo
           blk.call(res, ok)
         end
       end
-      op.define_singleton_method(:io) do
-        chan.send :io_r
+      op.define_singleton_method(:register) do |io_w|
+        chan.send :register, io_w
       end
       op
     end
@@ -304,9 +344,8 @@ module Rbgo
         res = blk.call unless blk.nil?
         res
       end
-
-      op.define_singleton_method(:io) do
-        chan.send :io_r
+      op.define_singleton_method(:register) do |io_w|
+        chan.send :register, io_w
       end
       op
     end
