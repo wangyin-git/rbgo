@@ -20,7 +20,6 @@ module Rbgo
       def register(io)
         register_mutex.synchronize do
           ios << io
-          p ios
         end
       end
 
@@ -303,7 +302,6 @@ module Rbgo
             rescue ThreadError
             end
           end
-
         end
       ensure
         close_io_blk.call
