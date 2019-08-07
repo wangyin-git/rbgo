@@ -19,6 +19,7 @@ module Rbgo
 
       def register(io)
         register_mutex.synchronize do
+          ios.delete_if { |io| io.closed? }
           ios << io
         end
       end
@@ -53,7 +54,7 @@ module Rbgo
         self.have_enq_waiting_flag = false
         self.have_deq_waiting_flag = false
 
-        self.ios = []
+        self.ios            = []
         self.register_mutex = Mutex.new
       end
 
@@ -202,7 +203,7 @@ module Rbgo
         super(max)
         @mutex = Mutex.new
 
-        self.ios = []
+        self.ios            = []
         self.register_mutex = Mutex.new
       end
 
