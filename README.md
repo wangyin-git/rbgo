@@ -119,7 +119,8 @@ require 'rbgo'
 
 #localhost, port 3000
 tcp_service = Rbgo::NetworkServiceFactory.open_tcp_service(3000) do|sock, clientAddrInfo|
-  p [sock, clientAddrInfo]
+  p [sock, clientAddrInfo] 
+  sock.close  #should close sock manually
 end                  
 
                                         
