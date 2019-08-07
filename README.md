@@ -103,12 +103,23 @@ go! do
 
 end
 
+# Once do block only once
+
+once = Rbgo::Once.new
+2.times do
+  go do
+    once.do { puts 'only once' }
+  end
+end
+
+
+
 # Actor handle message sequentially
   
-actor = Actor.new do|msg, actor|     
+actor = Rbgo::Actor.new do|msg, actor|     
           case msg
           when :msg1
-            # do some work
+            # do some work 
           when :msg2
             # do some work
           when :msg3
@@ -116,7 +127,7 @@ actor = Actor.new do|msg, actor|
           end
         end
 
-actor.send_msg :msg1
+actor.send_msg :msg1 #won't block
 
 ```            
 # NetworkService
