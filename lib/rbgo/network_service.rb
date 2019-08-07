@@ -12,7 +12,7 @@ module Rbgo
       attr_accessor :task
 
       def alive?
-        service_routine.alive? unless service_routine.nil?
+        return service_routine.alive? unless service_routine.nil?
         false
       end
 
@@ -44,7 +44,7 @@ module Rbgo
       res_chan = Chan.new(1)
       service  = Service.send :new
 
-      go do
+      routine = go! do
         service.send :type=, :tcp
         service.send :host=, host
         service.send :port=, port
@@ -53,33 +53,27 @@ module Rbgo
           Socket.tcp_server_sockets(host, port) do |sockets|
             service.send :port=, sockets.first.local_address.ip_port
             service.send :sockets=, sockets
-
-            routine = go! do
-              begin
-                Socket.accept_loop(sockets) do |sock, clientAddrInfo|
-                  go do
-                    if service.task.nil?
-                      sock.close
-                    else
-                      service.task.call(sock, clientAddrInfo)
-                    end
+            res_chan << service
+            begin
+              Socket.accept_loop(sockets) do |sock, clientAddrInfo|
+                go do
+                  if service.task.nil?
+                    sock.close
+                  else
+                    service.task.call(sock, clientAddrInfo)
                   end
                 end
-              rescue Exception => ex
-                STDERR.puts ex
               end
+            rescue Exception => ex
+              STDERR.puts ex
             end
-            service.send :service_routine=, routine
-
-            res_chan << service
-
           end
         rescue Exception => ex
           res_chan << service
           STDERR.puts ex
         end
       end
-
+      service.send :service_routine=, routine
       res_chan.deq
       service
     end
@@ -89,7 +83,7 @@ module Rbgo
       res_chan = Chan.new(1)
       service  = Service.send :new
 
-      go do
+      routine = go! do
         service.send :type=, :udp
         service.send :host=, host
         service.send :port=, port
@@ -98,29 +92,23 @@ module Rbgo
           Socket.udp_server_sockets(host, port) do |sockets|
             service.send :port=, sockets.first.local_address.ip_port
             service.send :sockets=, sockets
-
-            routine = go! do
-              begin
-                Socket.udp_server_loop_on(sockets) do |msg, msg_src|
-                  go do
-                    service.task.call(msg, msg_src) unless service.task.nil?
-                  end
-                end
-              rescue Exception => ex
-                STDERR.puts ex
-              end
-            end
-            service.send :service_routine=, routine
-
             res_chan << service
-
+            begin
+              Socket.udp_server_loop_on(sockets) do |msg, msg_src|
+                go do
+                  service.task.call(msg, msg_src) unless service.task.nil?
+                end
+              end
+            rescue Exception => ex
+              STDERR.puts ex
+            end
           end
         rescue Exception => ex
           res_chan << service
           STDERR.puts ex
         end
       end
-
+      service.send :service_routine=, routine
       res_chan.deq
       service
     end
