@@ -103,8 +103,20 @@ go! do
 
 end
 
+# Actor handle message sequentially
+  
+actor = Actor.new do|msg, actor|     
+          case msg
+          when :msg1
+            # do some work
+          when :msg2
+            # do some work
+          when :msg3
+            actor.send_msg :msg1 
+          end
+        end
 
-
+actor.send_msg :msg1
 
 ```            
 # NetworkService
