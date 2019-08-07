@@ -39,7 +39,7 @@ module Rbgo
     def start_msg_loop
       go! do
         while msg = mail_box.deq
-          handler.call(msg) rescue nil
+          handler.call(msg, self) rescue nil
         end
       end
     end
