@@ -7,6 +7,7 @@ require_relative 'io_machine'
 module Rbgo
   module CoRun
     IS_CORUN_FIBER = :is_corun_fiber_bbc0f70e
+    YIELD_IO_OPERATION = :yield_bbc0f70e
 
     def self.is_in_corun_fiber?
       !!Thread.current[IS_CORUN_FIBER]
@@ -16,7 +17,7 @@ module Rbgo
       if is_in_corun_fiber?
         return "" if length == 0
         receipt = Scheduler.instance.io_machine.do_read(io, length: length)
-        Fiber.yield receipt
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
       else
         io.read(length)
       end
@@ -25,7 +26,7 @@ module Rbgo
     def self.write_to(io, str:)
       if is_in_corun_fiber?
         receipt = Scheduler.instance.io_machine.do_write(io, str: str)
-        Fiber.yield receipt
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
       else
         io.write(str)
       end
@@ -41,7 +42,7 @@ module Rbgo
 
       private
 
-      attr_accessor :args, :blk, :fiber
+      attr_accessor :args, :blk, :fiber, :io_receipt
 
       def initialize(*args, new_thread: false, &blk)
         self.args = args
@@ -73,7 +74,20 @@ module Rbgo
         end if fiber.nil?
 
         if fiber.alive?
-          fiber.resume(*args)
+          if io_receipt.nil?
+            obj = fiber.resume(*args)
+          else
+            io_receipt.wait
+            obj = fiber.resume(io_receipt.res)
+          end
+          if obj.is_a?(Array) &&
+            obj.size == 2 &&
+            obj[0] == YIELD_IO_OPERATION &&
+            obj[1].is_a?(IOReceipt)
+            self.io_receipt = obj[1]
+          else
+            self.io_receipt = nil
+          end
         end
         nil
       end
@@ -230,9 +244,9 @@ module Rbgo
       end
     end
   end
-  
+
   CoRun.freeze
-  
+
   module CoRunExtensions
     refine Object do
       def go(*args, &blk)
@@ -245,7 +259,7 @@ module Rbgo
     end
 
     refine IO do
-      def read_yield(len)
+      def read_yield(len = nil)
         CoRun.read_from(self, length: len)
       end
 
