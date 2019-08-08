@@ -14,9 +14,9 @@ module Rbgo
 
     def self.read_from(io, length: nil)
       if is_in_corun_fiber?
+        return "" if length == 0
         receipt = Scheduler.instance.io_machine.do_read(io, length: length)
-
-        #Fiber.yield receipt
+        Fiber.yield receipt
       else
         io.read(length)
       end
@@ -25,8 +25,7 @@ module Rbgo
     def self.write_to(io, str:)
       if is_in_corun_fiber?
         receipt = Scheduler.instance.io_machine.do_write(io, str: str)
-
-        #Fiber.yield receipt
+        Fiber.yield receipt
       else
         io.write(str)
       end
@@ -137,6 +136,7 @@ module Rbgo
                   task.send :perform
                 rescue Exception => ex
                   task.error = ex
+                  STDERR.puts(ex)
                   next
                 ensure
                   Thread.current.thread_variable_set(:performing, false)

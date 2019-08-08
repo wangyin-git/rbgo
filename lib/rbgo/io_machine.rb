@@ -37,8 +37,6 @@ module Rbgo
   end
 
 
-
-
   class IOMachine
     def do_read(io, length: nil)
       op      = [:register_read, io, length]
@@ -83,13 +81,16 @@ module Rbgo
         case
         when param_pattern_match([:register_read, IO, Integer], op)
           handle_read_msg(receipt)
+        when param_pattern_match([:register_read, IO, nil], op)
+          handle_read_msg(receipt)
         when param_pattern_match([:register_write, IO, String], op)
           handle_write_msg(receipt)
         end
       end #end of actor
 
-    end #end of initialize
+    end
 
+    #end of initialize
 
 
     def handle_select_msg(msg, actor)
@@ -114,6 +115,8 @@ module Rbgo
       op                 = receipt.registered_op
       io                 = op[1]
       len                = op[2]
+      res                = StringIO.new
+      buf_size           = 1024 * 512
       registered_monitor = monitors[io]
       if registered_monitor && (registered_monitor.interests == :r || registered_monitor.interests == :rw)
         actor.send_msg receipt
@@ -130,18 +133,24 @@ module Rbgo
 
       monitor.value    ||= []
       monitor.value[0] = proc do
-        res      = StringIO.new
-        buf_size = 1024 * 512
         if len.nil?
+          notify_blk = proc do
+            monitors.delete(monitor.io)
+            monitor.close
+            receipt.res = res.string
+            receipt.notify
+          end
           loop do
-            buf = io.read_nonblock(buf_size, exception: false)
+            begin
+              buf = io.read_nonblock(buf_size, exception: false)
+            rescue Exception => ex
+              notify_blk.call
+              break
+            end
             if buf == :wait_readable
               break
             elsif buf.nil?
-              monitors.delete(monitor.io)
-              monitor.close
-              receipt.res = res.string
-              receipt.notify
+              notify_blk.call
               break
             end
             res << buf
@@ -171,7 +180,12 @@ module Rbgo
               notify_blk.call
               break
             end
-            buf = io.read_nonblock(need_read_bytes_n, exception: false)
+            begin
+              buf = io.read_nonblock(need_read_bytes_n, exception: false)
+            rescue Exception => ex
+              notify_blk.call
+              break
+            end
             if buf == :wait_readable
               break
             elsif buf.nil?
