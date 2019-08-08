@@ -1,7 +1,5 @@
 require 'thread'
-require_relative 'corun'
 
-using Rbgo::CoRunExtensions
 
 module Rbgo
   class Actor
@@ -37,7 +35,7 @@ module Rbgo
     private
 
     def start_msg_loop
-      go! do
+      CoRun::Routine.new(new_thread: true) do
         while msg = mail_box.deq
           handler.call(msg, self) rescue nil
         end

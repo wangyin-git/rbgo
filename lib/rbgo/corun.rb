@@ -2,9 +2,35 @@ require 'thread'
 require 'fiber'
 require 'system'
 require 'singleton'
+require_relative 'io_machine'
 
 module Rbgo
   module CoRun
+    IS_CORUN_FIBER = :is_corun_fiber_bbc0f70e
+
+    def self.is_in_corun_fiber?
+      !!Thread.current[IS_CORUN_FIBER]
+    end
+
+    def self.read_from(io, length: nil)
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_read(io, length: length)
+
+        #Fiber.yield receipt
+      else
+        io.read(length)
+      end
+    end
+
+    def self.write_to(io, str:)
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_write(io, str: str)
+
+        #Fiber.yield receipt
+      else
+        io.write(str)
+      end
+    end
 
     class Routine
       attr_accessor :error
@@ -43,6 +69,7 @@ module Rbgo
 
       def perform
         self.fiber = Fiber.new do |args|
+          Thread.current[IS_CORUN_FIBER] = true
           blk.call(*args)
         end if fiber.nil?
 
@@ -56,7 +83,7 @@ module Rbgo
     class Scheduler
 
       include Singleton
-      attr_accessor :num_thread, :check_interval
+      attr_accessor :num_thread, :check_interval, :io_machine
 
       private
 
@@ -66,13 +93,15 @@ module Rbgo
       attr_accessor :supervisor_thread
 
       def initialize
-        self.num_thread  = System::CPU.count rescue 8
+        self.num_thread = System::CPU.count rescue 8
         self.thread_pool = []
 
         self.msg_queue  = Queue.new
         self.task_queue = Queue.new
 
         self.check_interval = 0.1
+
+        self.io_machine = IOMachine.new
 
         msg_queue << :init
         create_supervisor_thread
@@ -201,7 +230,9 @@ module Rbgo
       end
     end
   end
-
+  
+  CoRun.freeze
+  
   module CoRunExtensions
     refine Object do
       def go(*args, &blk)
@@ -210,6 +241,16 @@ module Rbgo
 
       def go!(*args, &blk)
         CoRun::Routine.new(*args, new_thread: true, &blk)
+      end
+    end
+
+    refine IO do
+      def read_yield(len)
+        CoRun.read_from(self, length: len)
+      end
+
+      def write_yield(str)
+        CoRun.write_to(self, str: str)
       end
     end
   end
