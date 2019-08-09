@@ -279,11 +279,11 @@ module Rbgo
     end
 
     refine IO do
-      def read_yield(len = nil)
+      def yield_read(len = nil)
         CoRun.read_from(self, length: len)
       end
 
-      def write_yield(str)
+      def yield_write(str)
         CoRun.write_to(self, str: str)
       end
     end
