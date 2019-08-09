@@ -133,6 +133,11 @@ actor.send_msg :msg1 #won't block
 # IOMachine
 IOMachine wrap nio4r to do IO operation asynchronously.
 
+support platforms: MRI, JRuby.
+
+*Not supported platform: Truffleruby*
+
+
 ```ruby  
 require 'rbgo'
 
