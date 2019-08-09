@@ -144,6 +144,7 @@ module Rbgo
             begin
               buf = io.read_nonblock(buf_size, exception: false)
             rescue Exception => ex
+              STDERR.puts ex
               notify_blk.call
               break
             end
@@ -183,6 +184,7 @@ module Rbgo
             begin
               buf = io.read_nonblock(need_read_bytes_n, exception: false)
             rescue Exception => ex
+              STDERR.puts ex
               notify_blk.call
               break
             end
@@ -237,6 +239,7 @@ module Rbgo
             receipt.notify
           end
         rescue Exception => ex
+          STDERR.puts ex
           monitors.delete(monitor.io)
           monitor.close
           receipt.res = bytes_written_n
