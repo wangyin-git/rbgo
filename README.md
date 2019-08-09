@@ -132,6 +132,7 @@ actor.send_msg :msg1 #won't block
 ```            
 # IOMachine
 IOMachine wrap nio4r to do IO operation asynchronously.
+
 ```ruby  
 require 'rbgo'
 
@@ -199,13 +200,13 @@ io_w.close
 # 
 # go do
 #   fiber = Fiber.new do
-#     io_r.yield_self # will not do yield. just do normal IO#read
+#     io_r.yield_read # will not do yield. just do normal IO#read
 #   end
 #   fiber.resume
 # end
 # 
 # go! do
-#   io_r.yield_self # will not do yield. just do normal IO#read
+#   io_r.yield_read # will not do yield. just do normal IO#read
 # end
 
 ```
