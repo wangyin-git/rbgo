@@ -144,8 +144,8 @@ module Rbgo
             begin
               buf = io.read_nonblock(buf_size, exception: false)
             rescue Exception => ex
-              STDERR.puts ex
               notify_blk.call
+              STDERR.puts ex
               break
             end
             if buf == :wait_readable
@@ -184,8 +184,8 @@ module Rbgo
             begin
               buf = io.read_nonblock(need_read_bytes_n, exception: false)
             rescue Exception => ex
-              STDERR.puts ex
               notify_blk.call
+              STDERR.puts ex
               break
             end
             if buf == :wait_readable
@@ -239,11 +239,11 @@ module Rbgo
             receipt.notify
           end
         rescue Exception => ex
-          STDERR.puts ex
           monitors.delete(monitor.io)
           monitor.close
           receipt.res = bytes_written_n
           receipt.notify
+          STDERR.puts ex
         end
       end
       actor.send_msg :do_select

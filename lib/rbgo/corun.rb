@@ -59,6 +59,7 @@ module Rbgo
               end
             rescue Exception => ex
               self.error = ex
+              STDERR.puts ex
             end
           end
 
