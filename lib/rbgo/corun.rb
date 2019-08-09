@@ -146,7 +146,9 @@ module Rbgo
                       if task.nil?
                         task = task_queue.deq
                       else
-                        sleep 0.1 # only pending io tasks in queue
+                        # only pending io tasks in queue
+                        receipt = task.send(:io_receipt)
+                        sleep 0.1 unless receipt.done_flag
                       end
                     else
                       receipt = task.send(:io_receipt)
