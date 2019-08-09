@@ -3,7 +3,7 @@ require_relative 'actor'
 
 module Rbgo
   class IOReceipt
-    attr_reader :registered_op
+    attr_reader :registered_op, :done_flag
     attr_accessor :res
 
     def wait
@@ -25,8 +25,8 @@ module Rbgo
 
     private
 
-    attr_accessor :done_flag, :mutex, :cond
-    attr_writer :registered_op
+    attr_accessor :mutex, :cond
+    attr_writer :registered_op, :done_flag
 
     def initialize(op)
       self.done_flag     = false
@@ -71,7 +71,7 @@ module Rbgo
 
       self.actor = Actor.new do |msg, actor|
         if msg == :do_select
-          handle_select_msg(msg, actor)
+          handle_select_msg(actor)
           next
         end
 
@@ -80,11 +80,11 @@ module Rbgo
 
         case
         when param_pattern_match([:register_read, IO, Integer], op)
-          handle_read_msg(receipt)
+          handle_read_msg(receipt, actor)
         when param_pattern_match([:register_read, IO, nil], op)
-          handle_read_msg(receipt)
+          handle_read_msg(receipt, actor)
         when param_pattern_match([:register_write, IO, String], op)
-          handle_write_msg(receipt)
+          handle_write_msg(receipt, actor)
         end
       end #end of actor
 
@@ -93,9 +93,9 @@ module Rbgo
     #end of initialize
 
 
-    def handle_select_msg(msg, actor)
+    def handle_select_msg(actor)
       return if selector.empty?
-      selector.select(1) do |monitor|
+      selector.select(0.1) do |monitor|
         if monitor.readiness == :r
           monitor.value[0].call
         elsif monitor.readiness == :w
@@ -111,7 +111,7 @@ module Rbgo
     end
 
 
-    def handle_read_msg(receipt)
+    def handle_read_msg(receipt, actor)
       op                 = receipt.registered_op
       io                 = op[1]
       len                = op[2]
@@ -201,7 +201,7 @@ module Rbgo
     end
 
 
-    def handle_write_msg(receipt)
+    def handle_write_msg(receipt, actor)
       op  = receipt.registered_op
       io  = op[1]
       str = op[2].to_s

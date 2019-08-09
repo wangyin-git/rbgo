@@ -6,7 +6,7 @@ require_relative 'io_machine'
 
 module Rbgo
   module CoRun
-    IS_CORUN_FIBER = :is_corun_fiber_bbc0f70e
+    IS_CORUN_FIBER     = :is_corun_fiber_bbc0f70e
     YIELD_IO_OPERATION = :yield_bbc0f70e
 
     def self.is_in_corun_fiber?
@@ -77,8 +77,11 @@ module Rbgo
           if io_receipt.nil?
             obj = fiber.resume(*args)
           else
-            io_receipt.wait
-            obj = fiber.resume(io_receipt.res)
+            if io_receipt.done_flag
+              obj = fiber.resume(io_receipt.res)
+            else
+              return nil
+            end
           end
           if obj.is_a?(Array) &&
             obj.size == 2 &&
@@ -127,22 +130,38 @@ module Rbgo
           thread_pool << Thread.new do
             Thread.current.report_on_exception = false
             begin
-              should_exit      = false
-              yield_task_queue = Queue.new
-              local_task_queue = Queue.new
+              should_exit           = false
+              yield_task_queue      = Queue.new
+              pending_io_task_queue = Queue.new
+              local_task_queue      = Queue.new
               loop do
                 task = nil
                 if local_task_queue.empty?
                   task = task_queue.deq(true) rescue nil
                   if task.nil?
                     task = yield_task_queue.deq unless yield_task_queue.empty?
-                    task = task_queue.deq if task.nil?
-                    local_task_queue << task
-                  else
-                    local_task_queue << task
-                    local_task_queue << yield_task_queue.deq unless yield_task_queue.empty?
+                    if task.nil?
+                      task = pending_io_task_queue.deq unless pending_io_task_queue.empty?
+                      if task.nil?
+                        task = task_queue.deq
+                      else
+                        sleep 0.1 # only pending io tasks in queue
+                      end
+                    else
+                      receipt = task.send(:io_receipt)
+                      if receipt
+                        pending_io_task_queue << task unless receipt.done_flag
+                        next
+                      end
+                    end
                   end
+
+                  local_task_queue << task
+                  local_task_queue << yield_task_queue.deq unless yield_task_queue.empty?
+                  local_task_queue << pending_io_task_queue.deq unless pending_io_task_queue.empty?
+
                 end
+
                 task = local_task_queue.deq
 
                 begin
@@ -162,6 +181,7 @@ module Rbgo
 
                 should_exit = Thread.current.thread_variable_get(:should_exit) &&
                   yield_task_queue.empty? &&
+                  pending_io_task_queue.empty? &&
                   local_task_queue.empty?
                 break if should_exit
               end
