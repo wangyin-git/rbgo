@@ -3,6 +3,7 @@ require 'fiber'
 require 'system'
 require 'singleton'
 require_relative 'io_machine'
+require_relative 'once'
 
 module Rbgo
   module CoRun
@@ -49,7 +50,8 @@ module Rbgo
         self.blk  = blk
         if new_thread
           Thread.new do
-            self.fiber = Fiber.new do |args|
+            Thread.current.report_on_exception = false
+            self.fiber                         = Fiber.new do |args|
               blk.call(*args)
             end
 
@@ -102,12 +104,24 @@ module Rbgo
       include Singleton
       attr_accessor :num_thread, :check_interval, :io_machine
 
+      def io_machine
+        io_machine_init_once.do do
+          @io_machine = IOMachine.new
+        end
+        @io_machine
+      end
+
+      def io_machine=(machine)
+        @io_machine = machine
+      end
+
       private
 
       attr_accessor :thread_pool
       attr_accessor :task_queue
       attr_accessor :msg_queue
       attr_accessor :supervisor_thread
+      attr_accessor :io_machine_init_once
 
       def initialize
         self.num_thread = System::CPU.count rescue 8
@@ -118,7 +132,7 @@ module Rbgo
 
         self.check_interval = 0.1
 
-        self.io_machine = IOMachine.new
+        self.io_machine_init_once = Once.new
 
         msg_queue << :init
         create_supervisor_thread
