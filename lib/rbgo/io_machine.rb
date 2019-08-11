@@ -52,6 +52,27 @@ module Rbgo
       receipt
     end
 
+    def do_read_line(io, sep: $/, limit: nil)
+      op      = [:register_read_line, io, sep, limit]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
+    def do_read_lines(io, sep: $/, limit: nil)
+      op      = [:register_read_lines, io, sep, limit]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
+    def do_read_partial(io, maxlen:)
+      op      = [:register_read_partial, io, maxlen]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
     def close
       actor.close
       selector.close
@@ -78,12 +99,12 @@ module Rbgo
         receipt = msg
         op      = receipt.registered_op
 
-        case
-        when param_pattern_match([:register_read, IO, Integer], op)
+        case op[0]
+        when :register_read
           handle_read_msg(receipt, actor)
-        when param_pattern_match([:register_read, IO, nil], op)
-          handle_read_msg(receipt, actor)
-        when param_pattern_match([:register_write, IO, String], op)
+        when :register_read_line
+          handle_read_line_msg(receipt, actor)
+        when :register_write
           handle_write_msg(receipt, actor)
         end
       end #end of actor
@@ -111,35 +132,128 @@ module Rbgo
     end
 
 
-    def handle_read_msg(receipt, actor)
-      op                 = receipt.registered_op
-      io                 = op[1]
-      len                = op[2]
-      res                = StringIO.new
-      buf_size           = 1024 * 512
-      registered_monitor = monitors[io]
-      if registered_monitor && (registered_monitor.interests == :r || registered_monitor.interests == :rw)
-        actor.send_msg receipt
-        return
-      end
 
-      if registered_monitor
-        registered_monitor.add_interest(:r)
-        monitor = registered_monitor
-      else
-        monitor      = selector.register(io, :r)
-        monitors[io] = monitor
-      end
+
+
+    def handle_read_line_msg(receipt, actor)
+      op    = receipt.registered_op
+      io    = op[1]
+      sep   = op[2]
+      limit = op[3]
+      buf_size = 512 * 1024
+      res   = ""
+
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
 
       monitor.value    ||= []
       monitor.value[0] = proc do
-        if len.nil?
-          notify_blk = proc do
-            monitors.delete(monitor.io)
-            monitor.close
-            receipt.res = res.string
-            receipt.notify
+        notify_blk = proc do
+          monitors.delete(monitor.io)
+          monitor.close
+          if limit && limit > 0 && res.length == 0
+            receipt.res = nil
+          else
+            receipt.res = res
           end
+          receipt.notify
+        end
+
+        sep = "$/$/" if (sep && sep.length == 0)
+
+        if limit.nil?
+          buf_size = 1 unless sep.nil?
+          loop do
+            begin
+              buf = io.read_nonblock(buf_size, exception: false)
+            rescue Exception => ex
+              notify_blk.call       
+              STDERR.puts ex
+              break
+            end
+            if buf == :wait_readable
+              break
+            elsif buf.nil?
+              notify_blk.call
+              break
+            end
+            res << buf
+            unless sep.nil?
+              if res.end_with?(sep)
+                notify_blk.call
+                break
+              end
+            end
+          end
+        elsif limit > 0
+          bytes_read_n = 0
+          loop do
+            need_read_bytes_n = limit - bytes_read_n
+            if need_read_bytes_n <= 0
+              notify_blk.call
+              break
+            end
+            if sep.nil?
+              buf_size = need_read_bytes_n
+            else
+              buf_size = 1
+            end
+            begin
+              buf = io.read_nonblock(buf_size, exception: false)
+            rescue Exception => ex
+              notify_blk.call
+              STDERR.puts ex
+              break
+            end
+            if buf == :wait_readable
+              break
+            elsif buf.nil?
+              notify_blk.call
+              break
+            end
+            res << buf
+            bytes_read_n += buf.bytesize
+            unless sep.nil?
+              if res.end_with?(sep)
+                notify_blk.call
+                break
+              end
+            end
+          end
+        else
+          notify_blk.call
+        end
+      end
+      actor.send_msg :do_select
+    end
+
+
+
+
+
+
+    def handle_read_msg(receipt, actor)
+      op       = receipt.registered_op
+      io       = op[1]
+      len      = op[2]
+      res      = ""
+      buf_size = 1024 * 512
+
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
+      notify_blk = proc do
+        monitors.delete(monitor.io)
+        monitor.close
+        if len && len > 0 && res.length == 0
+          receipt.res = nil
+        else
+          receipt.res = res
+        end
+        receipt.notify
+      end
+      monitor.value    ||= []
+      monitor.value[0] = proc do
+        if len.nil?
           loop do
             begin
               buf = io.read_nonblock(buf_size, exception: false)
@@ -157,23 +271,9 @@ module Rbgo
             res << buf
           end
         elsif len == 0
-          monitors.delete(monitor.io)
-          monitor.close
-          receipt.res = ""
-          receipt.notify
+          notify_blk.call
           break
         else
-          notify_blk = proc do
-            monitors.delete(monitor.io)
-            monitor.close
-            if res.string.length == 0
-              receipt.res = nil
-            else
-              receipt.res = res.string
-            end
-            receipt.notify
-          end
-
           bytes_read_n = 0
           loop do
             need_read_bytes_n = len - bytes_read_n
@@ -203,24 +303,17 @@ module Rbgo
     end
 
 
+
+
+
+
     def handle_write_msg(receipt, actor)
       op  = receipt.registered_op
       io  = op[1]
       str = op[2].to_s
 
-      registered_monitor = monitors[io]
-      if registered_monitor && (registered_monitor.interests == :w || registered_monitor.interests == :rw)
-        actor.send_msg receipt
-        return
-      end
-
-      if registered_monitor
-        registered_monitor.add_interest(:w)
-        monitor = registered_monitor
-      else
-        monitor      = selector.register(io, :w)
-        monitors[io] = monitor
-      end
+      monitor = register(receipt, interest: :w)
+      return if monitor.nil?
 
       buf = NIO::ByteBuffer.new(str.bytesize)
       buf << str
@@ -250,17 +343,26 @@ module Rbgo
     end
 
 
-    def param_pattern_match(pattern, params)
-      return false unless pattern.is_a?(Array) && params.is_a?(Array)
-      return false if pattern.size != params.size
-      match = true
-      pattern.zip(params) do |type, param|
-        unless type === param
-          match = false
-          break
-        end
+
+
+
+    def register(receipt, interest:)
+      io                 = receipt.registered_op[1]
+      registered_monitor = monitors[io]
+      if registered_monitor && (registered_monitor.interests == interest || registered_monitor.interests == :rw)
+        actor.send_msg receipt
+        return nil
       end
-      match
+
+      if registered_monitor
+        registered_monitor.add_interest(interest)
+        monitor = registered_monitor
+      else
+        monitor      = selector.register(io, interest)
+        monitors[io] = monitor
+      end
+      monitor
     end
+
   end
 end
