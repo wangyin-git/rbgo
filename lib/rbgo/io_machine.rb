@@ -59,6 +59,13 @@ module Rbgo
       receipt
     end
 
+    def do_read_partial(io, maxlen:)
+      op      = [:register_read_partial, io, maxlen]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
 
     def close
       actor.close
@@ -91,6 +98,8 @@ module Rbgo
           handle_read_msg(receipt, actor)
         when :register_read_line
           handle_read_line_msg(receipt, actor)
+        when :register_read_partial
+          handle_read_partial_msg(receipt, actor)
         when :register_write
           handle_write_msg(receipt, actor)
         end
@@ -118,6 +127,44 @@ module Rbgo
       nil
     end
 
+
+    def handle_read_partial_msg(receipt, actor)
+      op     = receipt.registered_op
+      io     = op[1]
+      maxlen = op[2]
+      res    = ""
+
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
+
+      monitor.value    ||= []
+      monitor.value[0] = proc do
+        notify_blk = proc do
+          monitors.delete(monitor.io)
+          monitor.close
+          receipt.res = res
+          receipt.notify
+        end
+        catch :exit do
+          begin
+            buf = io.read_nonblock(maxlen, exception: false)
+          rescue Exception => ex
+            notify_blk.call
+            STDERR.puts ex
+            throw :exit
+          end
+          if buf == :wait_readable
+            throw :exit
+          elsif buf.nil?
+            notify_blk.call
+            throw :exit
+          end
+          res << buf
+          notify_blk.call
+        end
+      end
+      actor.send_msg :do_select
+    end
 
     def handle_read_line_msg(receipt, actor)
       op       = receipt.registered_op

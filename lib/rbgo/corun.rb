@@ -34,6 +34,16 @@ module Rbgo
       end
     end
 
+    def self.read_partial_from(io, maxlen:)
+      if is_in_corun_fiber?
+        return "" if maxlen == 0
+        receipt = Scheduler.instance.io_machine.do_read_partial(io, maxlen: maxlen)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        io.readpartial(maxlen)
+      end
+    end
+
     def self.write_to(io, str:)
       if is_in_corun_fiber?
         receipt = Scheduler.instance.io_machine.do_write(io, str: str)
@@ -314,6 +324,10 @@ module Rbgo
 
       def yield_read_line(sep = $/, limit = nil)
         CoRun.read_line_from(self, sep: sep, limit: limit)
+      end
+
+      def yield_read_partial(maxlen)
+        CoRun.read_partial_from(self, maxlen: maxlen)
       end
 
       def yield_write(str)
