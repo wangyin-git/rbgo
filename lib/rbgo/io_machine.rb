@@ -59,19 +59,6 @@ module Rbgo
       receipt
     end
 
-    def do_read_lines(io, sep: $/, limit: nil)
-      op      = [:register_read_lines, io, sep, limit]
-      receipt = IOReceipt.new(op)
-      actor.send_msg(receipt)
-      receipt
-    end
-
-    def do_read_partial(io, maxlen:)
-      op      = [:register_read_partial, io, maxlen]
-      receipt = IOReceipt.new(op)
-      actor.send_msg(receipt)
-      receipt
-    end
 
     def close
       actor.close
@@ -132,16 +119,13 @@ module Rbgo
     end
 
 
-
-
-
     def handle_read_line_msg(receipt, actor)
-      op    = receipt.registered_op
-      io    = op[1]
-      sep   = op[2]
-      limit = op[3]
+      op       = receipt.registered_op
+      io       = op[1]
+      sep      = op[2]
+      limit    = op[3]
       buf_size = 512 * 1024
-      res   = ""
+      res      = ""
 
       monitor = register(receipt, interest: :r)
       return if monitor.nil?
@@ -159,7 +143,7 @@ module Rbgo
           receipt.notify
         end
 
-        sep = "$/$/" if (sep && sep.length == 0)
+        sep        = "\n\n" if (sep && sep.length == 0)
 
         if limit.nil?
           buf_size = 1 unless sep.nil?
@@ -167,7 +151,7 @@ module Rbgo
             begin
               buf = io.read_nonblock(buf_size, exception: false)
             rescue Exception => ex
-              notify_blk.call       
+              notify_blk.call
               STDERR.puts ex
               break
             end
@@ -228,10 +212,6 @@ module Rbgo
     end
 
 
-
-
-
-
     def handle_read_msg(receipt, actor)
       op       = receipt.registered_op
       io       = op[1]
@@ -241,7 +221,7 @@ module Rbgo
 
       monitor = register(receipt, interest: :r)
       return if monitor.nil?
-      notify_blk = proc do
+      notify_blk       = proc do
         monitors.delete(monitor.io)
         monitor.close
         if len && len > 0 && res.length == 0
@@ -303,10 +283,6 @@ module Rbgo
     end
 
 
-
-
-
-
     def handle_write_msg(receipt, actor)
       op  = receipt.registered_op
       io  = op[1]
@@ -341,9 +317,6 @@ module Rbgo
       end
       actor.send_msg :do_select
     end
-
-
-
 
 
     def register(receipt, interest:)

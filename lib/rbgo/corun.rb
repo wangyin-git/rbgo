@@ -30,7 +30,7 @@ module Rbgo
         receipt = Scheduler.instance.io_machine.do_read_line(io, sep: sep, limit: limit)
         Fiber.yield [YIELD_IO_OPERATION, receipt]
       else
-        io.read_line(sep, limit)
+        io.readline(sep, limit)
       end
     end
 
