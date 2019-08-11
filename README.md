@@ -231,12 +231,13 @@ require 'rbgo'
 using Rbgo::CoRunExtensions
 
 #localhost, port 3000
-tcp_service = Rbgo::NetworkServiceFactory.open_tcp_service(3000) do|sock, clientAddrInfo|
-  p [sock, clientAddrInfo] 
-  p sock.yield_read
-  sock.yield_write("hello")
-  sock.close  #SHOULD CLOSE SOCK MANUALLY since version 0.2.0
-end                  
+tcp_service = Rbgo::NetworkServiceFactory.open_tcp_service(3000) do|sock, _|
+  sock.yield_read_line("\r\n\r\n") # read http request
+  sock.close_read
+  sock.yield_write("HTTP/1.1 200 OK \r\n\r\nHello World!")
+  sock.close_write
+  sock.close
+end                 
 
                                         
 
