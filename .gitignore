@@ -6,4 +6,5 @@ pkg/*
 tmp/*
 .rbx
 Gemfile.lock
+.bash_history
 
