@@ -4,8 +4,6 @@ require 'thread'
 module Rbgo
   class Actor
     private
-
-    ACTOR_QUEUE_TAG = :actor_bbc0f70e
     attr_accessor :mail_box
 
     public
