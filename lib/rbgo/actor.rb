@@ -5,6 +5,7 @@ module Rbgo
   class Actor
     private
 
+    ACTOR_QUEUE_TAG = :actor_bbc0f70e
     attr_accessor :mail_box
 
     public
@@ -35,9 +36,10 @@ module Rbgo
     private
 
     def start_msg_loop
-      CoRun::Routine.new(new_thread: true) do
+      CoRun::Routine.new(new_thread: true, queue_tag: :default) do
         while msg = mail_box.deq
           handler.call(msg, self) rescue nil
+          Fiber.yield
         end
       end
     end

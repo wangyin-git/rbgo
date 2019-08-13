@@ -65,29 +65,10 @@ module Rbgo
 
       attr_accessor :args, :blk, :fiber, :io_receipt
 
-      def initialize(*args, new_thread: false, &blk)
+      def initialize(*args, new_thread: false, queue_tag: :default, &blk) # :default :none :actor
         self.args = args
         self.blk  = blk
-        if new_thread
-          Thread.new do
-            Thread.current.report_on_exception = false
-            self.fiber                         = Fiber.new do |args|
-              blk.call(*args)
-            end
-
-            begin
-              while fiber.alive?
-                fiber.resume(*args)
-              end
-            rescue Exception => ex
-              self.error = ex
-              STDERR.puts ex
-            end
-          end
-
-        else
-          Scheduler.instance.schedule(self)
-        end
+        Scheduler.instance.schedule(self, new_thread: new_thread, queue_tag: queue_tag)
       end
 
       def perform
@@ -138,7 +119,7 @@ module Rbgo
       private
 
       attr_accessor :thread_pool
-      attr_accessor :task_queue
+      attr_accessor :task_queues, :task_queues_mutex
       attr_accessor :msg_queue
       attr_accessor :supervisor_thread
       attr_accessor :io_machine_init_once
@@ -147,20 +128,21 @@ module Rbgo
         self.num_thread = System::CPU.count rescue 8
         self.thread_pool = []
 
-        self.msg_queue  = Queue.new
-        self.task_queue = Queue.new
+        self.msg_queue         = Queue.new
+        self.task_queues       = Hash.new { |hash, key| hash[key] = Queue.new }
+        self.task_queues_mutex = Mutex.new
 
         self.check_interval = 0.1
 
         self.io_machine_init_once = Once.new
 
-        msg_queue << :init
+        msg_queue << [:init]
         create_supervisor_thread
         generate_check_msg
       end
 
       # only called by supervisor thread
-      def create_thread
+      def create_thread(run_for_once: false, queue_tag: :default, init_task: nil)
         begin
           thread_pool << Thread.new do
             Thread.current.report_on_exception = false
@@ -169,6 +151,8 @@ module Rbgo
               yield_task_queue      = Queue.new
               pending_io_task_queue = Queue.new
               local_task_queue      = Queue.new
+              task_queue            = get_queue(queue_tag)
+              local_task_queue << init_task if init_task
               loop do
                 task = nil
                 if local_task_queue.empty?
@@ -218,14 +202,20 @@ module Rbgo
                   yield_task_queue << task
                 end
 
-                should_exit = Thread.current.thread_variable_get(:should_exit) &&
-                  yield_task_queue.empty? &&
-                  pending_io_task_queue.empty? &&
-                  local_task_queue.empty?
+                if run_for_once
+                  should_exit = yield_task_queue.empty? &&
+                    pending_io_task_queue.empty? &&
+                    local_task_queue.empty?
+                else
+                  should_exit = Thread.current.thread_variable_get(:should_exit) &&
+                    yield_task_queue.empty? &&
+                    pending_io_task_queue.empty? &&
+                    local_task_queue.empty?
+                end
                 break if should_exit
               end
             ensure
-              msg_queue << :thread_exit unless should_exit
+              msg_queue << [:thread_exit] unless should_exit
             end
           end
         rescue Exception => ex
@@ -239,9 +229,13 @@ module Rbgo
           begin
             loop do
               msg = msg_queue.deq
-              case msg
+              case msg[0]
               when :thread_exit, :init, :check
                 check_thread_pool
+              when :new_thread
+                  task = msg[1]
+                  tag  = msg[2]
+                  create_thread(run_for_once: true, queue_tag: tag, init_task: task)
               end
             end
           ensure
@@ -255,7 +249,7 @@ module Rbgo
         Thread.new do
           begin
             loop do
-              msg_queue << :check
+              msg_queue << [:check]
               sleep check_interval
             end
           ensure
@@ -295,10 +289,21 @@ module Rbgo
         nil
       end
 
+      def get_queue(tag)
+        task_queues_mutex.synchronize do
+          task_queues[tag]
+        end
+      end
+
       public
 
-      def schedule(routine)
-        task_queue << routine
+      def schedule(routine, new_thread: false, queue_tag: :default)
+        if new_thread
+          msg_queue << [:new_thread, routine, queue_tag]
+        else
+          queue = get_queue(queue_tag)
+          queue << routine
+        end
         nil
       end
     end
@@ -309,11 +314,11 @@ module Rbgo
   module CoRunExtensions
     refine Object do
       def go(*args, &blk)
-        CoRun::Routine.new(*args, new_thread: false, &blk)
+        CoRun::Routine.new(*args, new_thread: false, queue_tag: :default, &blk)
       end
 
       def go!(*args, &blk)
-        CoRun::Routine.new(*args, new_thread: true, &blk)
+        CoRun::Routine.new(*args, new_thread: true, queue_tag: :none, &blk)
       end
     end
 
