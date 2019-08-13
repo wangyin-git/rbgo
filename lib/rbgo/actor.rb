@@ -37,7 +37,9 @@ module Rbgo
 
     def start_msg_loop
       CoRun::Routine.new(new_thread: true, queue_tag: :default) do
-        while msg = mail_box.deq
+        loop do
+          break if mail_box.closed?
+          msg = mail_box.deq
           handler.call(msg, self) rescue nil
           Fiber.yield
         end
