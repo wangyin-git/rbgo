@@ -66,6 +66,19 @@ module Rbgo
       receipt
     end
 
+    def do_socket_accept(sock)
+      op      = [:register_socket_accept, sock]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
+    def do_socket_connect(sock, remote_sockaddr:)
+      op      = [:register_socket_connect, sock, remote_sockaddr]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
 
     def close
       actor.close
@@ -102,6 +115,10 @@ module Rbgo
           handle_read_partial_msg(receipt, actor)
         when :register_write
           handle_write_msg(receipt, actor)
+        when :register_socket_accept
+          handle_socket_accept_msg(receipt, actor)
+        when :register_socket_connect
+          handle_socket_connect_msg(receipt, actor)
         end
       end #end of actor
 
@@ -127,6 +144,74 @@ module Rbgo
       nil
     end
 
+    def handle_socket_connect_msg(receipt, actor)
+
+      op              = receipt.registered_op
+      sock            = op[1]
+      remote_sockaddr = op[2]
+      res             = nil
+
+      monitor = register(receipt, interest: :w)
+      return if monitor.nil?
+
+      monitor.value    ||= []
+      monitor.value[1] = proc do
+        notify_blk = proc do
+          monitors.delete(monitor.io)
+          monitor.close
+          receipt.res = res
+          receipt.notify
+        end
+        catch :exit do
+          begin
+            res = sock.connect_nonblock(remote_sockaddr, exception: false)
+          rescue Exception => ex
+            notify_blk.call
+            STDERR.puts ex
+            throw :exit
+          end
+          if res == :wait_writable
+            throw :exit
+          end
+          notify_blk.call
+        end
+      end
+      monitor.value[1].call
+      actor.send_msg :do_select
+    end
+
+    def handle_socket_accept_msg(receipt, actor)
+      op   = receipt.registered_op
+      sock = op[1]
+      res  = nil
+
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
+
+      monitor.value    ||= []
+      monitor.value[0] = proc do
+        notify_blk = proc do
+          monitors.delete(monitor.io)
+          monitor.close
+          receipt.res = res
+          receipt.notify
+        end
+        catch :exit do
+          begin
+            res = sock.accept_nonblock(exception: false)
+          rescue Exception => ex
+            notify_blk.call
+            STDERR.puts ex
+            throw :exit
+          end
+          if res == :wait_readable
+            throw :exit
+          end
+          notify_blk.call
+        end
+      end
+      actor.send_msg :do_select
+    end
 
     def handle_read_partial_msg(receipt, actor)
       op     = receipt.registered_op
@@ -362,6 +447,7 @@ module Rbgo
           STDERR.puts ex
         end
       end
+      monitor.value[1].call
       actor.send_msg :do_select
     end
 

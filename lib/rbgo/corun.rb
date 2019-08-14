@@ -44,6 +44,24 @@ module Rbgo
       end
     end
 
+    def self.accept_from(sock)
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_socket_accept(sock)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        sock.accept
+      end
+    end
+
+    def self.connect_to(sock, remote_sockaddr:)
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_socket_connect(sock, remote_sockaddr: remote_sockaddr)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        sock.connect(remote_sockaddr)
+      end
+    end
+
     def self.write_to(io, str:)
       if is_in_corun_fiber?
         receipt = Scheduler.instance.io_machine.do_write(io, str: str)
@@ -233,9 +251,9 @@ module Rbgo
               when :thread_exit, :init, :check
                 check_thread_pool
               when :new_thread
-                  task = msg[1]
-                  tag  = msg[2]
-                  create_thread(run_for_once: true, queue_tag: tag, init_task: task)
+                task = msg[1]
+                tag  = msg[2]
+                create_thread(run_for_once: true, queue_tag: tag, init_task: task)
               end
             end
           ensure
@@ -338,7 +356,16 @@ module Rbgo
       def yield_write(str)
         CoRun.write_to(self, str: str)
       end
+    end
 
+    refine Socket do
+      def yield_accept
+        CoRun.accept_from(self)
+      end
+
+      def yield_connect(remote_sockaddr)
+        CoRun.connect_to(self, remote_sockaddr: remote_sockaddr)
+      end
     end
   end
 end
