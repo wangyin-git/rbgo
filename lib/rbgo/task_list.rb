@@ -1,4 +1,5 @@
 require 'thread'
+require 'timeout'
 
 module Rbgo
   using CoRunExtensions
@@ -8,12 +9,20 @@ module Rbgo
 
     def <<(task)
       task_queue << task
+      self
     end
 
-    def add(*tasks)
-      tasks.each do |task|
-        task_queue << task
+    def add(task, timeout: nil, skip_on_exception: false)
+      task_queue << proc do |last_task_result|
+        begin
+          Timeout::timeout(timeout) do
+            task.call(last_task_result)
+          end
+        rescue Exception
+          raise unless skip_on_exception
+        end
       end
+      self
     end
 
     def start(arg = nil)
@@ -23,17 +32,20 @@ module Rbgo
         go(arg) do |last_task_result|
           begin
             task = task_queue.deq(true)
-            res  = task.call(last_task_result)
           rescue ThreadError
             notify
             self.start_once = Once.new
-          rescue Exception => ex
-            self.last_error = ex
-            notify
-            self.start_once = Once.new
           else
-            self.start_once = Once.new
-            start(res)
+            begin
+              res = task.call(last_task_result)
+            rescue Exception => ex
+              self.last_error = ex
+              notify
+              self.start_once = Once.new
+            else
+              self.start_once = Once.new
+              start(res)
+            end
           end
         end
       end
