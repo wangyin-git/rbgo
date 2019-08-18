@@ -90,7 +90,7 @@ module Rbgo
       end
 
       def perform
-        self.fiber = Fiber.new do |args|
+        self.fiber = Fiber.new do |*args|
           Thread.current[IS_CORUN_FIBER] = true
           blk.call(*args)
         end if fiber.nil?

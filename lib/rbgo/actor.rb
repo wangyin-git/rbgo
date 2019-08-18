@@ -4,6 +4,7 @@ require 'thread'
 module Rbgo
   class Actor
     private
+
     attr_accessor :mail_box
 
     public
@@ -38,7 +39,11 @@ module Rbgo
         loop do
           break if mail_box.closed?
           msg = mail_box.deq
-          handler.call(msg, self) rescue nil
+          begin
+            handler.call(msg, self)
+          rescue Exception => ex
+            STDERR.puts ex
+          end
           Fiber.yield
         end
       end
