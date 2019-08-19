@@ -129,6 +129,38 @@ actor = Rbgo::Actor.new do|msg, actor|
 
 actor.send_msg :msg1 #won't block
 
+# TaskList do task in order but do it asynchronously, task may be executed in different thread
+ 
+task_list = Rbgo::TaskList.new
+
+task_1 = proc do
+  puts 'first'
+  1
+end
+
+task_2 = proc do |last_result|
+  puts 'second'
+  puts "last task result #{last_result}"
+  sleep 5
+  2
+end
+
+task_3 = proc do |last_result|
+  puts 'third'
+  puts "last task result #{last_result}"
+  3
+end
+
+task_list << task_1
+task_list.add(task_2, timeout: 2, skip_on_exception: true)
+task_list << task_3
+
+task_list.start
+task_list.wait
+p 'wait done.'                          
+p task_list.complete?
+p task_list.last_error
+
 ```            
 # IOMachine
 IOMachine wrap nio4r to do IO operation asynchronously.
@@ -207,9 +239,6 @@ io_w.close
 #   fiber.resume
 # end
 # 
-# go! do
-#   io_r.yield_read # will not do yield. just do normal IO#read
-# end
 
 ```
 
