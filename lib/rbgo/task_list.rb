@@ -18,7 +18,8 @@ module Rbgo
           Timeout::timeout(timeout) do
             task.call(last_task_result)
           end
-        rescue Exception
+        rescue Exception => ex
+          self.last_error = ex
           raise unless skip_on_exception
         end
       end
@@ -27,8 +28,7 @@ module Rbgo
 
     def start(arg = nil)
       start_once.do do
-        self.last_error = nil
-        self.running    = true
+        self.running = true
         go(arg) do |last_task_result|
           begin
             task = task_queue.deq(true)
@@ -52,19 +52,29 @@ module Rbgo
       nil
     end
 
-    def clear
+    def reset
       task_queue.clear
+      self.last_error = nil
     end
 
     def running?
       running
     end
 
-    def wait
-      wait_mutex.synchronize do
-        while running?
-          wait_cond.wait(wait_mutex)
+    def complete?
+      task_queue.empty?
+    end
+
+    def wait(timeout = nil)
+      begin
+        Timeout::timeout(timeout) do
+          wait_mutex.synchronize do
+            if running?
+              wait_cond.wait(wait_mutex)
+            end
+          end
         end
+      rescue Timeout::Error
       end
     end
 
