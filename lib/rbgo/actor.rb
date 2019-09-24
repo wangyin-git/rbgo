@@ -1,24 +1,25 @@
 require 'thread'
-require 'set'
+require_relative 'once'
 
 module Rbgo
   class Actor
     private
 
-    attr_accessor :mail_box
+    attr_accessor :mail_box, :once_for_msg_loop
 
     public
 
     attr_accessor :handler
 
     def initialize(&handler)
-      self.handler  = handler
-      self.mail_box = Queue.new
-      start_msg_loop
+      self.handler           = handler
+      self.mail_box          = Queue.new
+      self.once_for_msg_loop = Once.new
     end
 
     def send_msg(msg)
       mail_box << msg
+      start_msg_loop
       nil
     end
 
@@ -35,20 +36,23 @@ module Rbgo
     private
 
     def start_msg_loop
-      CoRun::Routine.new(new_thread: true, queue_tag: :default) do
-        loop do
-          begin
-            msg = mail_box.deq(true)
-          rescue ThreadError
-            unless CoRun.have_other_task_on_thread?
-              msg = mail_box.deq
-              break if mail_box.closed?
+      once_for_msg_loop.do do
+        CoRun::Routine.new(new_thread: true, queue_tag: :default) do
+          loop do
+            begin
+              msg = mail_box.deq(true)
+            rescue ThreadError
+              self.once_for_msg_loop = Once.new
+              if mail_box.empty?
+                break
+              else
+                start_msg_loop
+              end
+            else
               call_handler(msg)
             end
-          else
-            call_handler(msg)
+            Fiber.yield
           end
-          Fiber.yield
         end
       end
     end
