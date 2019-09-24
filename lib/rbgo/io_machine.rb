@@ -278,10 +278,17 @@ module Rbgo
         sep        = "\n\n" if (sep && sep.length == 0)
 
         if limit.nil?
-          buf_size = 1 unless sep.nil?
+          buf_size = 1 unless sep.nil? || io.is_a?(BasicSocket)
           loop do
             begin
-              buf = io.read_nonblock(buf_size, exception: false)
+              if sep && io.is_a?(BasicSocket)
+                buf = io.recv_nonblock(buf_size, Socket::MSG_PEEK, exception: false)
+                if buf != :wait_readable && buf.size == 0
+                  buf = nil
+                end
+              else
+                buf = io.read_nonblock(buf_size, exception: false)
+              end
             rescue Exception => ex
               notify_blk.call
               STDERR.puts ex
@@ -293,7 +300,16 @@ module Rbgo
               notify_blk.call
               break
             end
-            res << buf
+            if sep && io.is_a?(BasicSocket)
+              sep_index = buf.index(sep)
+              if sep_index
+                buf = buf[0...sep_index+sep.length]
+              end
+              res << buf
+              io.recv(buf.size)
+            else
+              res << buf
+            end
             unless sep.nil?
               if res.end_with?(sep)
                 notify_blk.call
@@ -309,13 +325,20 @@ module Rbgo
               notify_blk.call
               break
             end
-            if sep.nil?
+            if sep.nil? || io.is_a?(BasicSocket)
               buf_size = need_read_bytes_n
             else
               buf_size = 1
             end
             begin
-              buf = io.read_nonblock(buf_size, exception: false)
+              if sep && io.is_a?(BasicSocket)
+                buf = io.recv_nonblock(buf_size, Socket::MSG_PEEK, exception: false)
+                if buf != :wait_readable && buf.size == 0
+                  buf = nil
+                end
+              else
+                buf = io.read_nonblock(buf_size, exception: false)
+              end
             rescue Exception => ex
               notify_blk.call
               STDERR.puts ex
@@ -327,7 +350,16 @@ module Rbgo
               notify_blk.call
               break
             end
-            res << buf
+            if sep && io.is_a?(BasicSocket)
+              sep_index = buf.index(sep)
+              if sep_index
+                buf = buf[0...sep_index+sep.length]
+              end
+              res << buf
+              io.recv(buf.size)
+            else
+              res << buf
+            end
             bytes_read_n += buf.bytesize
             unless sep.nil?
               if res.end_with?(sep)
