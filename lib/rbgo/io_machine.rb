@@ -80,6 +80,27 @@ module Rbgo
       receipt
     end
 
+    def do_socket_recv(sock, maxlen:, flags: 0)
+      op      = [:register_socket_recv, sock, maxlen, flags]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
+    def do_socket_recvmsg(sock, maxdatalen: nil, flags: 0, maxcontrollen: nil, opts: {})
+      op      = [:register_socket_recvmsg, sock, maxdatalen, flags, maxcontrollen, opts]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
+    def do_socket_sendmsg(sock, mesg, flags: 0, dest_sockaddr: nil, controls: [])
+      op      = [:register_socket_sendmsg, sock, mesg, flags, dest_sockaddr, controls]
+      receipt = IOReceipt.new(op)
+      actor.send_msg(receipt)
+      receipt
+    end
+
     def close
       actor.close
       selector.close
@@ -119,6 +140,12 @@ module Rbgo
           handle_socket_accept_msg(receipt, actor)
         when :register_socket_connect
           handle_socket_connect_msg(receipt, actor)
+        when :register_socket_recv
+          handle_socket_recv_msg(receipt, actor)
+        when :register_socket_sendmsg
+          handle_socket_sendmsg_msg(receipt, actor)
+        when :register_socket_recvmsg
+          handle_socket_recvmsg_msg(receipt, actor)
         end
       end #end of actor
 
@@ -144,8 +171,171 @@ module Rbgo
       nil
     end
 
-    def handle_socket_connect_msg(receipt, actor)
+    def handle_socket_recv_msg(receipt, actor)
+      op     = receipt.registered_op
+      io     = op[1]
+      maxlen = op[2]
+      flags  = op[3]
+      res    = ""
 
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
+
+      monitor.value    ||= []
+      monitor.value[0] = proc do
+        notify_blk = proc do
+          monitors.delete(monitor.io)
+          monitor.close
+          receipt.res = res
+          receipt.notify
+        end
+        catch :exit do
+          begin
+            buf = io.recv_nonblock(maxlen, flags, exception: false)
+          rescue Exception => ex
+            notify_blk.call
+            STDERR.puts ex
+            throw :exit
+          end
+          if buf == :wait_readable
+            throw :exit
+          elsif buf.nil?
+            notify_blk.call
+            throw :exit
+          end
+          res << buf
+          notify_blk.call
+        end
+      end
+      actor.send_msg :do_select
+    end
+
+    def handle_socket_recvmsg_msg(receipt, actor)
+      op              = receipt.registered_op
+      sock            = op[1]
+      len             = op[2]
+      flags           = op[3]
+      maxcontrollen   = op[4]
+      opts            = op[5]
+
+      data            = ""
+      sender_addrinfo = nil
+      rflags          = 0
+      controls        = []
+
+      monitor = register(receipt, interest: :r)
+      return if monitor.nil?
+      notify_blk       = proc do
+        monitors.delete(monitor.io)
+        monitor.close
+        if len && len > 0 && data.length == 0
+          receipt.res = nil
+        else
+          receipt.res = [data, sender_addrinfo, rflags, *controls]
+        end
+        receipt.notify
+      end
+      monitor.value    ||= []
+      monitor.value[0] = proc do
+        if len.nil?
+          loop do
+            begin
+              buf = sock.recvmsg_nonblock(nil, flags, maxcontrollen, opts.merge(exception: false))
+            rescue Exception => ex
+              notify_blk.call
+              STDERR.puts ex
+              break
+            end
+            if buf == :wait_readable
+              break
+            elsif buf.nil?
+              notify_blk.call
+              break
+            end
+            data << buf[0]
+            sender_addrinfo = buf[1]
+            rflags          = buf[2]
+            controls.append(*buf[3..-1])
+          end
+        elsif len == 0
+          notify_blk.call
+          break
+        else
+          bytes_read_n = 0
+          loop do
+            need_read_bytes_n = len - bytes_read_n
+            if need_read_bytes_n <= 0
+              notify_blk.call
+              break
+            end
+            begin
+              buf = sock.recvmsg_nonblock(need_read_bytes_n, flags, maxcontrollen, opts.merge(exception: false))
+            rescue Exception => ex
+              notify_blk.call
+              STDERR.puts ex
+              break
+            end
+            if buf == :wait_readable
+              break
+            elsif buf.nil?
+              notify_blk.call
+              break
+            end
+            data << buf[0]
+            sender_addrinfo = buf[1]
+            rflags          = buf[2]
+            controls.append(*buf[3..-1])
+            bytes_read_n += buf[0].bytesize
+          end
+        end
+      end
+      actor.send_msg :do_select
+    end
+
+    def handle_socket_sendmsg_msg(receipt, actor)
+      op            = receipt.registered_op
+      sock          = op[1]
+      str           = op[2].to_s
+      flags         = op[3]
+      dest_sockaddr = op[4]
+      controls      = op[5]
+      monitor       = register(receipt, interest: :w)
+      return if monitor.nil?
+
+      bytes_written_n  = 0
+      monitor.value    ||= []
+      monitor.value[1] = proc do
+        loop do
+          begin
+            bytes_need_to_write_n = str.size - bytes_written_n
+            if bytes_need_to_write_n > 0
+              n = sock.sendmsg_nonblock(str[bytes_written_n..-1], flags, dest_sockaddr, *controls, exception: false)
+            else
+              monitors.delete(monitor.io)
+              monitor.close
+              receipt.res = str.bytesize
+              receipt.notify
+              break
+            end
+          rescue Exception => ex
+            monitors.delete(monitor.io)
+            monitor.close
+            receipt.res = bytes_written_n
+            receipt.notify
+            STDERR.puts ex
+            break
+          end
+          if n == :wait_writable
+            break
+          end
+          bytes_written_n += n
+        end
+      end
+      monitor.value[1].call
+      actor.send_msg :do_select
+    end
+
+    def handle_socket_connect_msg(receipt, actor)
       op              = receipt.registered_op
       sock            = op[1]
       remote_sockaddr = op[2]
@@ -303,7 +493,7 @@ module Rbgo
             if sep && io.is_a?(BasicSocket)
               sep_index = buf.index(sep)
               if sep_index
-                buf = buf[0...sep_index+sep.length]
+                buf = buf[0...sep_index + sep.length]
               end
               res << buf
               io.recv(buf.size)
@@ -353,7 +543,7 @@ module Rbgo
             if sep && io.is_a?(BasicSocket)
               sep_index = buf.index(sep)
               if sep_index
-                buf = buf[0...sep_index+sep.length]
+                buf = buf[0...sep_index + sep.length]
               end
               res << buf
               io.recv(buf.size)
@@ -374,7 +564,6 @@ module Rbgo
       end
       actor.send_msg :do_select
     end
-
 
     def handle_read_msg(receipt, actor)
       op       = receipt.registered_op
@@ -446,7 +635,6 @@ module Rbgo
       actor.send_msg :do_select
     end
 
-
     def handle_write_msg(receipt, actor)
       op  = receipt.registered_op
       io  = op[1]
@@ -483,7 +671,6 @@ module Rbgo
       actor.send_msg :do_select
     end
 
-
     def register(receipt, interest:)
       io                 = receipt.registered_op[1]
       registered_monitor = monitors[io]
@@ -501,6 +688,5 @@ module Rbgo
       end
       monitor
     end
-
   end
 end

@@ -68,6 +68,33 @@ module Rbgo
       end
     end
 
+    def self.recv_from(sock, maxlen:, flags: 0)
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_socket_recv(sock, maxlen: maxlen, flags: flags)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        sock.recv(maxlen, flags)
+      end
+    end
+
+    def self.recvmsg_from(sock, maxdatalen: nil, flags: 0, maxcontrollen: nil, opts: {})
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_socket_recvmsg(sock, maxdatalen: maxdatalen, flags: flags, maxcontrollen: maxcontrollen, opts: opts)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        sock.recvmsg(maxdatalen, flags, maxcontrollen, opts)
+      end
+    end
+
+    def self.sendmsg_to(sock, mesg, flags: 0, dest_sockaddr: nil, controls: [])
+      if is_in_corun_fiber?
+        receipt = Scheduler.instance.io_machine.do_socket_sendmsg(sock, mesg, flags: flags, dest_sockaddr: dest_sockaddr, controls: controls)
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        sock.sendmsg(mesg, flags, dest_sockaddr, *controls)
+      end
+    end
+
     def self.write_to(io, str:)
       if is_in_corun_fiber?
         receipt = Scheduler.instance.io_machine.do_write(io, str: str)
@@ -376,6 +403,18 @@ module Rbgo
 
       def yield_connect(remote_sockaddr)
         CoRun.connect_to(self, remote_sockaddr: remote_sockaddr)
+      end
+
+      def yield_recv(maxlen, flags = 0)
+        CoRun.recv_from(self, maxlen: maxlen, flags: flags)
+      end
+
+      def yield_recvmsg(maxdatalen = nil, flags = 0, maxcontrollen = nil, opts = {})
+        CoRun.recvmsg_from(self, maxdatalen: maxdatalen, flags: flags, maxcontrollen: maxcontrollen, opts: opts)
+      end
+
+      def yield_sendmsg(mesg, flags = 0, dest_sockaddr = nil, *controls)
+        CoRun.sendmsg_to(self, mesg, flags: flags, dest_sockaddr: dest_sockaddr, controls: controls)
       end
     end
   end
