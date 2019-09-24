@@ -160,7 +160,51 @@ task_list.wait
 p 'wait done.'                          
 p task_list.complete?
 p task_list.last_error
+                       
+# Reentrant/ReadWirte Mutex and Semaphore
 
+m = Rbgo::ReentrantMutex.new
+m.synchronize do
+  m.synchronize do
+    puts "I'm here!"
+  end
+end
+
+m2 = Rbgo::RWMutex.new
+5.times do
+  go do
+    m2.synchronize_r do
+      puts "got the read lock"
+    end
+  end
+end
+go do
+  m2.synchronize_w do
+    puts "got the write lock"
+    m2.synchronize_r do
+      puts 'now, downgrade to read lock'
+    end
+  end
+end
+
+sleep 2
+
+go do
+  s = Rbgo::Semaphore.new(5)
+
+  s.acquire(4) do
+    puts 'got the permits'
+  end
+
+  s.acquire_all do
+    puts 'got all available permits'
+  end
+
+  ok = s.try_acquire do
+    puts 'try success'
+  end
+  puts 'try ok!' if ok
+end
 ```            
 # IOMachine
 IOMachine wrap nio4r to do IO operation asynchronously.
