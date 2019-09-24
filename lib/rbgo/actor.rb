@@ -1,5 +1,5 @@
 require 'thread'
-
+require 'set'
 
 module Rbgo
   class Actor
@@ -37,16 +37,26 @@ module Rbgo
     def start_msg_loop
       CoRun::Routine.new(new_thread: true, queue_tag: :default) do
         loop do
-          break if mail_box.closed?
-          msg = mail_box.deq
           begin
-            handler.call(msg, self)
-          rescue Exception => ex
-            STDERR.puts ex
+            msg = mail_box.deq(true)
+          rescue ThreadError
+            unless CoRun.have_other_task_on_thread?
+              msg = mail_box.deq
+              break if mail_box.closed?
+              call_handler(msg)
+            end
+          else
+            call_handler(msg)
           end
           Fiber.yield
         end
       end
+    end
+
+    def call_handler(msg)
+      handler.call(msg, self) if handler
+    rescue Exception => ex
+      STDERR.puts ex
     end
   end
 end

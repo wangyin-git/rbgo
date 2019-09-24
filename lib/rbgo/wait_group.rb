@@ -3,12 +3,13 @@ require 'thread'
 module Rbgo
   class WaitGroup
     def initialize(init_count = 0)
-      self.total_count = [0, init_count].max
+      self.total_count = [0, init_count.to_i].max
       self.mutex       = Mutex.new
       self.cond        = ConditionVariable.new
     end
 
     def add(count)
+      count = count.to_i
       mutex.synchronize do
         c = total_count + count
         if c < 0

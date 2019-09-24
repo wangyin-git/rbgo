@@ -28,33 +28,13 @@ module Rbgo
 
     def start(arg = nil)
       start_once.do do
-        self.running = true
-        go(arg) do |last_task_result|
-          begin
-            task = task_queue.deq(true)
-          rescue ThreadError
-            notify
-            self.start_once = Once.new
-          else
-            begin
-              res = task.call(last_task_result)
-            rescue Exception => ex
-              self.last_error = ex
-              notify
-              self.start_once = Once.new
-            else
-              self.start_once = Once.new
-              start(res)
-            end
-          end
-        end
+        _start(arg)
       end
       nil
     end
 
-    def reset
+    def clear_task
       task_queue.clear
-      self.last_error = nil
     end
 
     def running?
@@ -62,19 +42,18 @@ module Rbgo
     end
 
     def complete?
-      task_queue.empty?
+      !running? && task_queue.empty?
+    end
+
+    def wakeup
+      wait_cond.signal
     end
 
     def wait(timeout = nil)
-      begin
-        Timeout::timeout(timeout) do
-          wait_mutex.synchronize do
-            if running?
-              wait_cond.wait(wait_mutex)
-            end
-          end
+      wait_mutex.synchronize do
+        if running?
+          wait_cond.wait(wait_mutex, timeout)
         end
-      rescue Timeout::Error
       end
     end
 
@@ -94,6 +73,29 @@ module Rbgo
       wait_mutex.synchronize do
         self.running = false
         wait_cond.signal
+      end
+    end
+
+    def _start(arg = nil)
+      self.last_error = nil unless running?
+      self.running    = true
+      go(arg) do |last_task_result|
+        begin
+          task = task_queue.deq(true)
+        rescue ThreadError
+          notify
+          self.start_once = Once.new
+        else
+          begin
+            res = task.call(last_task_result)
+          rescue Exception => ex
+            self.last_error = ex
+            notify
+            self.start_once = Once.new
+          else
+            _start(res)
+          end
+        end
       end
     end
   end

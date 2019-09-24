@@ -8,10 +8,16 @@ require_relative 'once'
 module Rbgo
   module CoRun
     IS_CORUN_FIBER     = :is_corun_fiber_bbc0f70e
+    LOCAL_TASK_QUEUES = :local_task_queues_bbc0f70e
     YIELD_IO_OPERATION = :yield_bbc0f70e
 
     def self.is_in_corun_fiber?
       !!Thread.current[IS_CORUN_FIBER]
+    end
+
+    def self.have_other_task_on_thread?
+      queues = Thread.current.thread_variable_get(LOCAL_TASK_QUEUES)
+      queues&.any?{|q| !q.empty?}
     end
 
     def self.read_from(io, length: nil)
@@ -169,6 +175,7 @@ module Rbgo
               yield_task_queue      = Queue.new
               pending_io_task_queue = Queue.new
               local_task_queue      = Queue.new
+              Thread.current.thread_variable_set(LOCAL_TASK_QUEUES,[yield_task_queue, pending_io_task_queue, local_task_queue])
               task_queue            = get_queue(queue_tag)
               local_task_queue << init_task if init_task
               loop do
@@ -337,6 +344,10 @@ module Rbgo
 
       def go!(*args, &blk)
         CoRun::Routine.new(*args, new_thread: true, queue_tag: :none, &blk)
+      end
+
+      def have_other_task_on_thread?
+        CoRun.have_other_task_on_thread?
       end
     end
 
