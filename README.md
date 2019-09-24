@@ -1,11 +1,3 @@
-# I like the way how golang does in concurrency.
- 
-You can produce a light weight routine easily with a keyword 'go' and communicate with each routine by channel.
-
-In MRI the GIL prevents you from running code parallelly, but there ara also other ruby implementations such as TruffleRuby or JRuby which can utilize all CPU cores.
-
-In MRI write program to run concurrently even not parallelly is also important.
-
 # This project is trying to help writing concurrent program with ruby a little easier.     
 
 # select_chan                       
