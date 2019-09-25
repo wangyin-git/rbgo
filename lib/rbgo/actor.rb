@@ -37,7 +37,7 @@ module Rbgo
 
     def start_msg_loop
       once_for_msg_loop.do do
-        CoRun::Routine.new(new_thread: true, queue_tag: :default) do
+        CoRun::Routine.new(new_thread: false, queue_tag: :default) do
           loop do
             begin
               msg = mail_box.deq(true)
