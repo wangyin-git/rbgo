@@ -43,11 +43,8 @@ module Rbgo
               msg = mail_box.deq(true)
             rescue ThreadError
               self.once_for_msg_loop = Once.new
-              if mail_box.empty?
-                break
-              else
-                start_msg_loop
-              end
+              start_msg_loop unless mail_box.empty?
+              break
             else
               call_handler(msg)
             end
