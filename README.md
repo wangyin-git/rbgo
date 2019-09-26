@@ -119,7 +119,36 @@ actor = Rbgo::Actor.new do|msg, actor|
           end
         end
 
-actor.send_msg :msg1 #won't block
+actor.send_msg :msg1 #won't block     
+
+# Actors can be parent-child relationship, and can be linked or monitored
+ 
+supervisor = Rbgo::Actor.new do |msg, actor|
+  case msg
+  when Rbgo::ActorClosedMsg
+    p msg.actor.close_reason # why actor closed
+    actor.spawn_monitor(&msg.actor.handler) # spawn again
+  end
+end
+
+10000.times do
+  supervisor.spawn_monitor do |msg, _|  # when these actors closed, supervisor will receive ActorClosedMsg
+                                        # and decide what to do
+    p msg
+  end
+end
+
+link1 = Rbgo::Actor.new do |msg, actor|
+end
+link2 = link1.spawn_link do
+end
+
+link1.close # any one of linked actors close will cause all other close
+
+# link / unlink
+# monitor / demonitor   
+# when use spawn_xx , actors have parent-child relationship 
+
 
 # TaskList do task in order but do it asynchronously, task may be executed in different thread
  

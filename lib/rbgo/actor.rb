@@ -4,7 +4,7 @@ require_relative 'synchronized_collection'
 require_relative 'reentrant_mutex'
 
 module Rbgo
-  class ActorCloseMsg
+  class ActorClosedMsg
     attr_accessor :actor
 
     def initialize(actor)
@@ -68,7 +68,7 @@ module Rbgo
           self.linked_actors = nil
 
           supervisor_actors.each do |sup|
-            sup.send_msg(ActorCloseMsg.new(self)) rescue nil
+            sup.send_msg(ActorClosedMsg.new(self)) rescue nil
           end
           self.supervisor_actors = nil
 
@@ -146,7 +146,7 @@ module Rbgo
         raise "can not monitor from a closed actor" if closed?
         actor.send(:close_mutex).synchronize do
           if actor.closed?
-            send_msg(ActorCloseMsg.new(actor))
+            send_msg(ActorClosedMsg.new(actor))
           else
             actor.send(:supervisor_actors).add(self)
           end
