@@ -244,7 +244,7 @@ module Rbgo
                   task.send :perform
                 rescue Exception => ex
                   task.error = ex
-                  STDERR.puts(ex)
+                  STDERR.puts(ex.backtrace)
                   next
                 ensure
                   Thread.current.thread_variable_set(:performing, false)
@@ -271,7 +271,7 @@ module Rbgo
             end
           end
         rescue Exception => ex
-          STDERR.puts ex
+          STDERR.puts(ex.backtrace)
         end
         nil
       end

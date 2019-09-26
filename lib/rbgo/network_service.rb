@@ -65,12 +65,12 @@ module Rbgo
                 end
               end
             rescue Exception => ex
-              STDERR.puts ex
+              STDERR.puts(ex.backtrace)
             end
           end
         rescue Exception => ex
           res_chan << service
-          STDERR.puts ex
+          STDERR.puts(ex.backtrace)
         end
       end
       service.send :service_routine=, routine
@@ -100,12 +100,12 @@ module Rbgo
                 end
               end
             rescue Exception => ex
-              STDERR.puts ex
+              STDERR.puts(ex.backtrace)
             end
           end
         rescue Exception => ex
           res_chan << service
-          STDERR.puts ex
+          STDERR.puts(ex.backtrace)
         end
       end
       service.send :service_routine=, routine
