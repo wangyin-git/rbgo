@@ -176,7 +176,7 @@ module Rbgo
               msg = mail_box.deq(true)
             rescue ThreadError
               self.once_for_msg_loop = Once.new
-              start_msg_loop unless mail_box.empty?
+              start_msg_loop unless (mail_box.empty? || mail_box.closed?)
               break
             else
               call_handler(msg)
