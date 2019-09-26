@@ -117,6 +117,7 @@ module Rbgo
       attr_accessor :args, :blk, :fiber, :io_receipt
 
       def initialize(*args, new_thread: false, queue_tag: :default, &blk) # :default :none :actor
+        raise 'Routine must have a block' if blk.nil?
         self.args = args
         self.blk  = blk
         Scheduler.instance.schedule(self, new_thread: new_thread, queue_tag: queue_tag)
@@ -244,6 +245,7 @@ module Rbgo
                   task.send :perform
                 rescue Exception => ex
                   task.error = ex
+                  STDERR.puts(ex.message)
                   STDERR.puts(ex.backtrace)
                   next
                 ensure
@@ -271,6 +273,7 @@ module Rbgo
             end
           end
         rescue Exception => ex
+          STDERR.puts(ex.message)
           STDERR.puts(ex.backtrace)
         end
         nil

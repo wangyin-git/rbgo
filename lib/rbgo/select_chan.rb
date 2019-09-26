@@ -92,6 +92,7 @@ module Rbgo
                       notify
                     end
                   rescue Exception => ex
+                    STDERR.puts(ex.message)
                     STDERR.puts(ex.backtrace)
                     sleep 1
                     retry

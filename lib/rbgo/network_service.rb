@@ -65,11 +65,13 @@ module Rbgo
                 end
               end
             rescue Exception => ex
+              STDERR.puts(ex.message)
               STDERR.puts(ex.backtrace)
             end
           end
         rescue Exception => ex
           res_chan << service
+          STDERR.puts(ex.message)
           STDERR.puts(ex.backtrace)
         end
       end
@@ -100,11 +102,13 @@ module Rbgo
                 end
               end
             rescue Exception => ex
+              STDERR.puts(ex.message)
               STDERR.puts(ex.backtrace)
             end
           end
         rescue Exception => ex
           res_chan << service
+          STDERR.puts(ex.message)
           STDERR.puts(ex.backtrace)
         end
       end
