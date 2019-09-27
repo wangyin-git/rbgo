@@ -148,7 +148,7 @@ module Rbgo
                       notify
                     end
                   rescue Exception => ex
-                    Rbgo.logger.error { "#{ex.message}\n#{ex.backtrace}" }
+                    Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
                     sleep 1
                     retry
                   end
