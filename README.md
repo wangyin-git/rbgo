@@ -29,7 +29,32 @@ select_chan(
   on_write(chan: ch3, obj: 'world'){
     #do when write success
   }
-){ puts 'call default block' }
+){ puts 'call default block' }  
+
+
+timeout_ch = Chan.after(4)
+job_ch1 = Chan.perform do
+  #do some job
+  sleep 
+end
+
+job_ch2 = Chan.perform(timeout: 3) do
+  #do some job
+  sleep
+end
+
+
+select_chan(
+  on_read(chan: job_ch1){
+    p :job_ch1
+  },
+  on_read(chan: job_ch2){
+    p :job_ch2
+  },
+  on_read(chan: timeout_ch){
+    p 'timeout'
+  }
+)
 ```
 # go                                
 create lightweight routine like golang
