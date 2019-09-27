@@ -3,8 +3,25 @@ require 'thread'
 module Rbgo
   module Channel
     module Chan
+      include Enumerable
+
+      def each
+        if block_given?
+          loop do
+            obj, ok = pop
+            if ok
+              yield obj
+            else
+              break
+            end
+          end
+        else
+          enum_for(:each)
+        end
+      end
 
       def self.new(max = 0)
+        max = max.to_i
         if max <= 0
           NonBufferChan.new
         else
@@ -21,7 +38,7 @@ module Rbgo
         end
         ch
       end
-      
+
       def self.tick(every_seconds)
         ch = new
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
@@ -222,38 +239,37 @@ module Rbgo
     #
     #
     class BufferChan < SizedQueue
+      alias_method :queue_max, :max
+      alias_method :queue_max=, :max=
       include Chan
-      include Enumerable
-
-      def each
-        if block_given?
-          loop do
-            begin
-              yield pop(true)
-            rescue ThreadError
-              return
-            end
-          end
-        else
-          enum_for(:each)
-        end
-      end
-
+      
       def initialize(max)
         super(max)
-        @mutex = Mutex.new
-
+        @mutex              = Mutex.new
+        @cond               = ConditionVariable.new
         self.ios            = []
         self.register_mutex = Mutex.new
       end
 
       def push(obj, nonblock = false)
-        super(obj, nonblock)
-        notify
-        self
-      rescue ThreadError
-        raise ClosedQueueError.new if closed?
-        raise
+        @mutex.synchronize do
+          begin
+            if nonblock
+              super(obj, true)
+            else
+              while length == queue_max && !closed?
+                @cond.wait(@mutex)
+              end
+              super(obj, false)
+            end
+            notify
+            @cond.broadcast
+            self
+          rescue ThreadError
+            raise ClosedQueueError.new if closed?
+            raise
+          end
+        end
       end
 
       def pop(nonblock = false)
@@ -262,8 +278,17 @@ module Rbgo
           ok  = true
           ok  = false if empty? && closed?
           begin
-            res = super(nonblock)
+            if nonblock
+              res = super(true)
+            else
+              while empty? && !closed?
+                @cond.wait(@mutex)
+              end
+              ok  = false if closed?
+              res = super(false)
+            end
             notify
+            @cond.broadcast
           rescue ThreadError
             raise unless closed?
             ok = false
@@ -282,6 +307,7 @@ module Rbgo
         @mutex.synchronize do
           super
           notify
+          @cond.broadcast
           self
         end
       end
