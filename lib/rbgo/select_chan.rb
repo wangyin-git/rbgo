@@ -12,6 +12,45 @@ module Rbgo
         end
       end
 
+      def self.after(seconds)
+        ch = new
+        CoRun::Routine.new(new_thread: true, queue_tag: :none) do
+          sleep seconds
+          ch << Time.now rescue nil
+          ch.close
+        end
+        ch
+      end
+      
+      def self.tick(every_seconds)
+        ch = new
+        CoRun::Routine.new(new_thread: true, queue_tag: :none) do
+          loop do
+            sleep every_seconds
+            begin
+              ch.enq(Time.now, true)
+            rescue ThreadError
+            end
+          end
+        end
+        ch
+      end
+
+      def self.perform(timeout: nil, &blk)
+        ch = new
+        CoRun::Routine.new(new_thread: false, queue_tag: :default) do
+          begin
+            Timeout::timeout(timeout) do
+              blk.call
+            end
+          rescue Timeout::Error
+          ensure
+            ch.close
+          end
+        end
+        ch
+      end
+
       private
 
       attr_accessor :ios
