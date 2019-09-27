@@ -245,8 +245,7 @@ module Rbgo
                   task.send :perform
                 rescue Exception => ex
                   task.error = ex
-                  STDERR.puts(ex.message)
-                  STDERR.puts(ex.backtrace)
+                  Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
                   next
                 ensure
                   Thread.current.thread_variable_set(:performing, false)
@@ -273,8 +272,7 @@ module Rbgo
             end
           end
         rescue Exception => ex
-          STDERR.puts(ex.message)
-          STDERR.puts(ex.backtrace)
+          Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
         end
         nil
       end
@@ -294,7 +292,7 @@ module Rbgo
               end
             end
           ensure
-            STDERR.puts 'supervisor thread exit'
+            Rbgo.logger.debug{ 'supervisor thread exit' }
           end
         end
         nil
@@ -308,7 +306,7 @@ module Rbgo
               sleep check_interval
             end
           ensure
-            STDERR.puts 'check generator thread exit'
+            Rbgo.logger.debug{ 'check generator thread exit' }
           end
         end
         nil

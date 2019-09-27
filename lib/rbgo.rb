@@ -11,3 +11,11 @@ require_relative 'rbgo/task_list'
 require_relative 'rbgo/io_machine'
 require_relative 'rbgo/network_service'
 require_relative 'rbgo/version'
+require 'logger'
+
+module Rbgo
+  class << self
+    attr_accessor :logger
+  end
+  self.logger = Logger.new(STDERR, level: Logger::DEBUG)
+end

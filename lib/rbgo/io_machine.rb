@@ -194,8 +194,7 @@ module Rbgo
             buf = io.recv_nonblock(maxlen, flags, exception: false)
           rescue Exception => ex
             notify_blk.call
-            STDERR.puts(ex.message)
-            STDERR.puts(ex.backtrace)
+            Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
             throw :exit
           end
           if buf == :wait_readable
@@ -244,8 +243,7 @@ module Rbgo
               buf = sock.recvmsg_nonblock(nil, flags, maxcontrollen, opts.merge(exception: false))
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -274,8 +272,7 @@ module Rbgo
               buf = sock.recvmsg_nonblock(need_read_bytes_n, flags, maxcontrollen, opts.merge(exception: false))
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -325,8 +322,7 @@ module Rbgo
             monitor.close
             receipt.res = bytes_written_n
             receipt.notify
-            STDERR.puts(ex.message)
-            STDERR.puts(ex.backtrace)
+            Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
             break
           end
           if n == :wait_writable
@@ -361,8 +357,7 @@ module Rbgo
             res = sock.connect_nonblock(remote_sockaddr, exception: false)
           rescue Exception => ex
             notify_blk.call
-            STDERR.puts(ex.message)
-            STDERR.puts(ex.backtrace)
+            Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
             throw :exit
           end
           if res == :wait_writable
@@ -396,8 +391,7 @@ module Rbgo
             res = sock.accept_nonblock(exception: false)
           rescue Exception => ex
             notify_blk.call
-            STDERR.puts(ex.message)
-            STDERR.puts(ex.backtrace)
+            Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
             throw :exit
           end
           if res == :wait_readable
@@ -431,8 +425,7 @@ module Rbgo
             buf = io.read_nonblock(maxlen, exception: false)
           rescue Exception => ex
             notify_blk.call
-            STDERR.puts(ex.message)
-            STDERR.puts(ex.backtrace)
+            Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
             throw :exit
           end
           if buf == :wait_readable
@@ -488,8 +481,7 @@ module Rbgo
               end
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -539,8 +531,7 @@ module Rbgo
               end
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -601,8 +592,7 @@ module Rbgo
               buf = io.read_nonblock(buf_size, exception: false)
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -628,8 +618,7 @@ module Rbgo
               buf = io.read_nonblock(need_read_bytes_n, exception: false)
             rescue Exception => ex
               notify_blk.call
-              STDERR.puts(ex.message)
-              STDERR.puts(ex.backtrace)
+              Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
               break
             end
             if buf == :wait_readable
@@ -675,8 +664,7 @@ module Rbgo
           monitor.close
           receipt.res = bytes_written_n
           receipt.notify
-          STDERR.puts(ex.message)
-          STDERR.puts(ex.backtrace)
+          Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
         end
       end
       monitor.value[1].call

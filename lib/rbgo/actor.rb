@@ -191,8 +191,7 @@ module Rbgo
       handler.call(msg, self) if handler
     rescue Exception => ex
       close(ex)
-      STDERR.puts(ex.message)
-      STDERR.puts(ex.backtrace)
+      Rbgo.logger.debug { "#{ex.message}\n#{ex.backtrace}" }
     end
   end
 end
