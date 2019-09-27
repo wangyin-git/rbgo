@@ -54,7 +54,21 @@ select_chan(
   on_read(chan: timeout_ch){
     p 'timeout'
   }
-)
+)        
+        
+# Chan is Enumerable
+ 
+ch = Chan.new
+
+go do
+  10.times do
+    ch << Time.now
+  end
+end
+
+ch.each do|obj|
+  p obj
+end
 ```
 # go                                
 create lightweight routine like golang
