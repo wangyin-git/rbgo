@@ -39,7 +39,37 @@ module Rbgo
       end
     end
 
-    def open_tcp_service(host = nil, port, &blk)
+    def self.open_tcp_service_with_sockets(sockets, &blk)
+      res_chan = Chan.new(1)
+      service  = Service.send :new
+
+      routine = go! do
+        service.send :type=, :tcp
+        service.send :host=, sockets.first.local_address.ip_address
+        service.send :port=, sockets.first.local_address.ip_port
+        service.task = blk
+        service.send :sockets=, sockets
+        res_chan << service
+        begin
+          Socket.accept_loop(sockets) do |sock, clientAddrInfo|
+            go do
+              if service.task.nil?
+                sock.close
+              else
+                service.task.call(sock, clientAddrInfo)
+              end
+            end
+          end
+        rescue Exception => ex
+          Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+        end
+      end
+      service.send :service_routine=, routine
+      res_chan.deq
+      service
+    end
+
+    def self.open_tcp_service(host = nil, port, &blk)
 
       res_chan = Chan.new(1)
       service  = Service.send :new
@@ -78,7 +108,32 @@ module Rbgo
       service
     end
 
-    def open_udp_service(host = nil, port, &blk)
+    def self.open_udp_service_with_sockets(sockets, &blk)
+      res_chan = Chan.new(1)
+      service  = Service.send :new
+      routine  = go! do
+        service.send :type=, :udp
+        service.send :host=, sockets.first.local_address.ip_address
+        service.send :port=, sockets.first.local_address.ip_port
+        service.task = blk
+        service.send :sockets=, sockets
+        res_chan << service
+        begin
+          Socket.udp_server_loop_on(sockets) do |msg, msg_src|
+            go do
+              service.task.call(msg, msg_src) unless service.task.nil?
+            end
+          end
+        rescue Exception => ex
+          Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+        end
+      end
+      service.send :service_routine=, routine
+      res_chan.deq
+      service
+    end
+
+    def self.open_udp_service(host = nil, port, &blk)
 
       res_chan = Chan.new(1)
       service  = Service.send :new
@@ -112,8 +167,5 @@ module Rbgo
       res_chan.deq
       service
     end
-
-    module_function :open_tcp_service, :open_udp_service
-    public :open_tcp_service, :open_udp_service
   end
 end

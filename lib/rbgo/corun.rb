@@ -292,7 +292,7 @@ module Rbgo
               end
             end
           ensure
-            Rbgo.logger&.debug('Rbgo') { 'supervisor thread exit' }
+            Rbgo.logger&.warn('Rbgo') { 'supervisor thread exit' }
           end
         end
         nil
@@ -306,7 +306,7 @@ module Rbgo
               sleep check_interval
             end
           ensure
-            Rbgo.logger&.debug('Rbgo') { 'check generator thread exit' }
+            Rbgo.logger&.warn('Rbgo') { 'check generator thread exit' }
           end
         end
         nil
