@@ -13,7 +13,6 @@ Gem::Specification.new do |s|
   s.description = "Write concurrent program with Ruby in Golang style."
   s.add_dependency "system", "~> 0.1.3"
   s.add_dependency "nio4r", "~> 2.4"
-  s.add_dependency "einhorn", "~> 0.7"
   s.files         = `git ls-files`.split("\n")
   s.license       = 'MIT'
 end
