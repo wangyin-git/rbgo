@@ -9,7 +9,7 @@ but not statically typed in my implementation.
 example:
 
 ```ruby
-relative 'rbgo'
+require 'rbgo'
 
 include Rbgo::Channel
 

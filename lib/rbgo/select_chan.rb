@@ -29,23 +29,26 @@ module Rbgo
         end
       end
 
-      def self.after(seconds)
+      def self.after(seconds, &blk)
         ch = new
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
           sleep seconds
-          ch << Time.now rescue nil
+          v = blk.nil? ? Time.now : blk.call
+          ch << v rescue nil
           ch.close
         end
         ch
       end
 
-      def self.tick(every_seconds)
+      def self.tick(every_seconds, &blk)
         ch = new
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
           loop do
+            break if ch.closed?
             sleep every_seconds
+            v = blk.nil? ? Time.now : blk.call
             begin
-              ch.enq(Time.now, true)
+              ch.enq(v, true)
             rescue ThreadError
             end
           end
