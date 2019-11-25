@@ -32,10 +32,13 @@ module Rbgo
       def self.after(seconds, &blk)
         ch = new
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
-          sleep seconds
-          v = blk.nil? ? Time.now : blk.call
-          ch << v rescue nil
-          ch.close
+          begin
+            sleep seconds
+            v = blk.nil? ? Time.now : blk.call
+            ch << v rescue nil
+          ensure
+            ch.close
+          end
         end
         ch
       end
@@ -43,14 +46,18 @@ module Rbgo
       def self.tick(every_seconds, &blk)
         ch = new
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
-          loop do
-            break if ch.closed?
-            sleep every_seconds
-            v = blk.nil? ? Time.now : blk.call
-            begin
-              ch.enq(v, true)
-            rescue ThreadError
+          begin
+            loop do
+              break if ch.closed?
+              sleep every_seconds
+              v = blk.nil? ? Time.now : blk.call
+              begin
+                ch.enq(v, true)
+              rescue ThreadError
+              end
             end
+          ensure
+            ch.close
           end
         end
         ch
@@ -244,7 +251,7 @@ module Rbgo
       alias_method :queue_max, :max
       alias_method :queue_max=, :max=
       include Chan
-      
+
       def initialize(max)
         super(max)
         @mutex              = Mutex.new
