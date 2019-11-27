@@ -673,6 +673,13 @@ module Rbgo
     def register(receipt, interest:)
       io                 = receipt.registered_op[1]
       registered_monitor = monitors[io]
+
+      if io.closed?
+        monitors.delete(io)
+        registered_monitor.close if registered_monitor
+        return nil
+      end
+
       if registered_monitor && (registered_monitor.interests == interest || registered_monitor.interests == :rw)
         actor.send_msg receipt
         return nil

@@ -180,7 +180,7 @@ module Rbgo
               break
             else
               call_handler(msg)
-            end
+            end                            
             Fiber.yield
           end
         end
