@@ -190,8 +190,7 @@ module Rbgo
     def call_handler(msg)
       handler.call(msg, self) if handler
     rescue Exception => ex
-      close(ex)
-      Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+      Rbgo.logger&.debug('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
     end
   end
 end
