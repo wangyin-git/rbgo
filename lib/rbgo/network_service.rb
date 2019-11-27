@@ -1,4 +1,5 @@
 require 'socket'
+require 'openssl'
 require_relative 'select_chan'
 require_relative 'corun'
 
@@ -61,6 +62,57 @@ module Rbgo
             end
           end
         rescue Exception => ex
+          Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+        end
+      end
+      service.send :service_routine=, routine
+      res_chan.deq
+      service
+    end
+
+    def self.open_ssl_service(host = nil, port, cert_file, key_file, &blk)
+      res_chan = Chan.new(1)
+      service  = Service.send :new
+
+      routine = go! do
+        service.send :type=, :tcp
+        service.send :host=, host
+        service.send :port=, port
+        service.task = blk
+        begin
+          cert     = OpenSSL::X509::Certificate.new(File.read(cert_file))
+          key      = OpenSSL::PKey::RSA.new(File.open(key_file))
+          ctx      = OpenSSL::SSL::SSLContext.new()
+          ctx.cert = cert
+          ctx.key  = key
+
+          tcp_server = TCPServer.new(host, port)
+          service.send :port=, tcp_server.local_address.ip_port
+          ssl_server = OpenSSL::SSL::SSLServer.new(tcp_server, ctx)
+          service.send :sockets=, [ssl_server]
+          res_chan << service
+          begin
+            loop do
+              sock = ssl_server.accept
+              sock.sync_close = true
+              go do
+                if service.task.nil?
+                  sock.close
+                else
+                  service.task.call(sock, sock.io.remote_address)
+                end
+              end
+            end
+          rescue Exception => ex
+            if ex.is_a? OpenSSL::SSL::SSLError
+              Rbgo.logger&.info('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+              retry
+            else
+              Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
+            end
+          end
+        rescue Exception => ex
+          res_chan << service
           Rbgo.logger&.error('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
         end
       end

@@ -2,6 +2,7 @@ require 'thread'
 require 'fiber'
 require 'system'
 require 'singleton'
+require 'openssl'
 require_relative 'io_machine'
 require_relative 'once'
 
@@ -416,6 +417,32 @@ module Rbgo
 
       def yield_sendmsg(mesg, flags = 0, dest_sockaddr = nil, *controls)
         CoRun.sendmsg_to(self, mesg, flags: flags, dest_sockaddr: dest_sockaddr, controls: controls)
+      end
+    end
+
+    refine OpenSSL::SSL::SSLSocket do
+      def yield_accept
+        CoRun.accept_from(self)
+      end
+
+      def yield_connect(remote_sockaddr)
+        CoRun.connect_to(self, remote_sockaddr: remote_sockaddr)
+      end
+
+      def yield_read(len = nil)
+        CoRun.read_from(self, length: len)
+      end
+
+      def yield_read_line(sep = $/, limit = nil)
+        CoRun.read_line_from(self, sep: sep, limit: limit)
+      end
+
+      def yield_read_partial(maxlen)
+        CoRun.read_partial_from(self, maxlen: maxlen)
+      end
+
+      def yield_write(str)
+        CoRun.write_to(self, str: str)
       end
     end
   end

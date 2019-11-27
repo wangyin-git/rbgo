@@ -638,25 +638,24 @@ module Rbgo
     def handle_write_msg(receipt, actor)
       op  = receipt.registered_op
       io  = op[1]
-      str = op[2].to_s
+      buf = op[2].to_s
 
       monitor = register(receipt, interest: :w)
       return if monitor.nil?
 
-      buf = NIO::ByteBuffer.new(str.bytesize)
-      buf << str
-      buf.flip
       bytes_written_n  = 0
       monitor.value    ||= []
       monitor.value[1] = proc do
         begin
-          if buf.remaining > 0
-            n               = buf.write_to(io)
-            bytes_written_n += n
+          if buf.size - bytes_written_n > 0
+            n               = io.write_nonblock(buf[bytes_written_n..-1], exception: false)
+            if n.is_a? Numeric
+              bytes_written_n += n
+            end
           else
             monitors.delete(monitor.io)
             monitor.close
-            receipt.res = str.bytesize
+            receipt.res = buf.bytesize
             receipt.notify
           end
         rescue Exception => ex
