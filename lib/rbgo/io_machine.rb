@@ -677,6 +677,8 @@ module Rbgo
       if io.closed?
         monitors.delete(io)
         registered_monitor.close if registered_monitor
+        receipt.res = nil
+        receipt.notify
         return nil
       end
 
