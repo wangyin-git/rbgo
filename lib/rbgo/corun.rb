@@ -9,7 +9,7 @@ require_relative 'once'
 module Rbgo
   module CoRun
     IS_CORUN_FIBER     = :is_corun_fiber_bbc0f70e
-    LOCAL_TASK_QUEUES = :local_task_queues_bbc0f70e
+    LOCAL_TASK_QUEUES  = :local_task_queues_bbc0f70e
     YIELD_IO_OPERATION = :yield_bbc0f70e
 
     def self.is_in_corun_fiber?
@@ -18,7 +18,7 @@ module Rbgo
 
     def self.have_other_task_on_thread?
       queues = Thread.current.thread_variable_get(LOCAL_TASK_QUEUES)
-      queues&.any?{|q| !q.empty?}
+      queues&.any? { |q| !q.empty? }
     end
 
     def self.read_from(io, length: nil)
@@ -125,10 +125,15 @@ module Rbgo
       end
 
       def perform
-        self.fiber = Fiber.new do |*args|
-          Thread.current[IS_CORUN_FIBER] = true
-          blk.call(*args)
-        end if fiber.nil?
+        if fiber.nil?
+          self.fiber = Fiber.new do |*args|
+            Thread.current[IS_CORUN_FIBER] = true
+            blk.call(*args)
+          end
+          self.fiber.define_singleton_method(:transfer) do
+            raise 'can not call transfer on CoRun fiber'
+          end
+        end
 
         if fiber.alive?
           if io_receipt.nil?
@@ -204,8 +209,8 @@ module Rbgo
               yield_task_queue      = Queue.new
               pending_io_task_queue = Queue.new
               local_task_queue      = Queue.new
-              Thread.current.thread_variable_set(LOCAL_TASK_QUEUES,[yield_task_queue, pending_io_task_queue, local_task_queue])
-              task_queue            = get_queue(queue_tag)
+              Thread.current.thread_variable_set(LOCAL_TASK_QUEUES, [yield_task_queue, pending_io_task_queue, local_task_queue])
+              task_queue = get_queue(queue_tag)
               local_task_queue << init_task if init_task
               loop do
                 task = nil
