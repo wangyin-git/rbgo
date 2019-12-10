@@ -130,7 +130,7 @@ module Rbgo
             Thread.current[IS_CORUN_FIBER] = true
             blk.call(*args)
           end
-          self.fiber.define_singleton_method(:transfer) do
+          fiber.define_singleton_method(:transfer) do
             raise 'can not call transfer on CoRun fiber'
           end
         end
