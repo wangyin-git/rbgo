@@ -1,4 +1,5 @@
 require 'thread'
+require 'set'
 
 module Rbgo
   module Channel
@@ -85,8 +86,13 @@ module Rbgo
 
       def register(io)
         register_mutex.synchronize do
-          ios.delete_if { |io| io.closed? }
           ios << io
+        end
+      end
+
+      def unregister(io)
+        register_mutex.synchronize do
+          ios.delete(io)
         end
       end
 
@@ -120,7 +126,7 @@ module Rbgo
         self.have_enq_waiting_flag = false
         self.have_deq_waiting_flag = false
 
-        self.ios            = []
+        self.ios            = Set.new
         self.register_mutex = Mutex.new
       end
 
@@ -256,7 +262,7 @@ module Rbgo
         super(max)
         @mutex              = Mutex.new
         @cond               = ConditionVariable.new
-        self.ios            = []
+        self.ios            = Set.new
         self.register_mutex = Mutex.new
       end
 
@@ -341,10 +347,10 @@ module Rbgo
 
       io_hash      = {}
       close_io_blk = proc do
-        io_hash.each_pair.flat_map do |k, v|
-          [k, v[1]]
-        end.each do |io|
-          io.close rescue nil
+        io_hash.each_pair do |io_r, (op, io_w)|
+          io_r.close rescue nil
+          io_w.close rescue nil
+          op.unregister(io_w)
         end
       end
 
@@ -402,6 +408,9 @@ module Rbgo
       op.define_singleton_method(:register) do |io_w|
         chan.send :register, io_w
       end
+      op.define_singleton_method(:unregister) do|io_w|
+        chan.send :unregister, io_w
+      end
       op
     end
 
@@ -420,6 +429,9 @@ module Rbgo
       end
       op.define_singleton_method(:register) do |io_w|
         chan.send :register, io_w
+      end
+      op.define_singleton_method(:unregister) do|io_w|
+        chan.send :unregister, io_w
       end
       op
     end
