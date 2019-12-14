@@ -68,9 +68,11 @@ module Rbgo
         ch = new
         CoRun::Routine.new(new_thread: false, queue_tag: :default) do
           begin
+            res = nil
             Timeout::timeout(timeout) do
-              blk.call
+              res = blk.call
             end
+            ch << res rescue nil
           rescue Timeout::Error
           ensure
             ch.close
