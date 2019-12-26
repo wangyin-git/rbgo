@@ -27,7 +27,8 @@ module Rbgo
         receipt = IOReceipt.new([:yield_io])
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
           begin
-            blk&.call(receipt)
+            res = blk&.call
+            receipt.res = res
           ensure
             receipt.notify
           end

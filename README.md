@@ -322,6 +322,15 @@ go do
                               # this operation will *NOT* block the current thread
                               # when io operation complete, thread will resume to execute from this point.
   p data
+end                   
+              
+require 'open-uri'
+go do
+  res = yield_io do
+    f = open("http://www.google.com")
+    f.read
+  end
+  p res
 end
 
 sleep 2
