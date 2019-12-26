@@ -4,6 +4,7 @@ require 'system'
 require 'singleton'
 require 'openssl'
 require_relative 'io_machine'
+require_relative 'io_receipt'
 require_relative 'once'
 
 module Rbgo
@@ -19,6 +20,22 @@ module Rbgo
     def self.have_other_task_on_thread?
       queues = Thread.current.thread_variable_get(LOCAL_TASK_QUEUES)
       queues&.any? { |q| !q.empty? }
+    end
+
+    def self.yield_io(&blk)
+      if is_in_corun_fiber?
+        receipt = IOReceipt.new([:yield_io])
+        CoRun::Routine.new(new_thread: true, queue_tag: :none) do
+          begin
+            blk&.call(receipt)
+          ensure
+            receipt.notify
+          end
+        end
+        Fiber.yield [YIELD_IO_OPERATION, receipt]
+      else
+        blk.call
+      end
     end
 
     def self.read_from(io, length: nil)
@@ -382,6 +399,10 @@ module Rbgo
 
       def have_other_task_on_thread?
         CoRun.have_other_task_on_thread?
+      end
+
+      def yield_io(&blk)
+        CoRun.yield_io(&blk)
       end
     end
 
