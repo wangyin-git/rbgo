@@ -223,7 +223,7 @@ module Rbgo
         begin
           Socket.udp_server_loop_on(sockets) do |msg, msg_src|
             go do
-              service.task.call(msg, msg_src) unless service.task.nil?
+              service.task&.call(msg, msg_src)
             end
           end
         rescue Exception => ex
@@ -253,7 +253,7 @@ module Rbgo
             begin
               Socket.udp_server_loop_on(sockets) do |msg, msg_src|
                 go do
-                  service.task.call(msg, msg_src) unless service.task.nil?
+                  service.task&.call(msg, msg_src)
                 end
               end
             rescue Exception => ex
