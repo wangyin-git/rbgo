@@ -35,7 +35,7 @@ module Rbgo
         end
         Fiber.yield [YIELD_IO_OPERATION, receipt]
       else
-        blk.call
+        blk&.call
       end
     end
 
