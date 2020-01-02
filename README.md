@@ -123,7 +123,20 @@ go do
     # ...
     Fiber.yield 
   end
+end      
+
+# yield_io create a new thread to do operations, current routine will yield to do other task,
+# it will come back to go on execute when yield_io block finish.  
+
+require 'open-uri'
+go do
+  res = yield_io do
+    f = open("http://www.google.com")
+    f.read
+  end
+  p res
 end
+               
 
 # Or use go!        
 
