@@ -27,7 +27,7 @@ module Rbgo
         receipt = IOReceipt.new([:yield_io])
         CoRun::Routine.new(new_thread: true, queue_tag: :none) do
           begin
-            res = blk&.call
+            res         = blk&.call
             receipt.res = res
           ensure
             receipt.notify
@@ -124,7 +124,7 @@ module Rbgo
     end
 
     class Routine
-      attr_accessor :error
+      attr_reader :error
 
       def alive?
         return fiber.alive? unless fiber.nil?
@@ -133,6 +133,7 @@ module Rbgo
 
       private
 
+      attr_writer :error
       attr_accessor :args, :blk, :fiber, :io_receipt
 
       def initialize(*args, new_thread: false, queue_tag: :default, &blk) # :default :none :actor
@@ -268,7 +269,7 @@ module Rbgo
                   Thread.current.thread_variable_set(:performing, true)
                   task.send :perform
                 rescue Exception => ex
-                  task.error = ex
+                  task.send :error=, ex
                   Rbgo.logger&.debug('Rbgo') { "#{ex.message}\n#{ex.backtrace}" }
                   next
                 ensure
