@@ -3,28 +3,43 @@ require 'set'
 
 module Rbgo
   class SyncArray < Array
-    @mutex = Mutex.new
+    include MonitorMixin
+
+    def initialize(*args)
+      super(*args)
+    end
+
     Array.public_instance_methods.each do |m|
       define_method(m) do |*args, &blk|
-        SyncArray.instance_variable_get(:@mutex).synchronize { super(*args, &blk) }
+        synchronize { super(*args, &blk) }
       end
     end
   end
 
   class SyncHash < Hash
-    @mutex = Mutex.new
+    include MonitorMixin
+
+    def initialize(*args)
+      super(*args)
+    end
+
     Hash.public_instance_methods.each do |m|
       define_method(m) do |*args, &blk|
-        SyncHash.instance_variable_get(:@mutex).synchronize { super(*args, &blk) }
+        synchronize { super(*args, &blk) }
       end
     end
   end
 
   class SyncSet < Set
-    @mutex = Mutex.new
+    include MonitorMixin
+
+    def initialize(*args)
+      super(*args)
+    end
+
     Set.public_instance_methods.each do |m|
       define_method(m) do |*args, &blk|
-        SyncSet.instance_variable_get(:@mutex).synchronize { super(*args, &blk) }
+        synchronize { super(*args, &blk) }
       end
     end
   end
